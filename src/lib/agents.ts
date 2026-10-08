@@ -162,7 +162,7 @@ export async function proposeCustom(
   const name = String(input.name ?? '').trim().slice(0, 80);
   const amount = Number(input.amount);
   const category = String(input.category ?? 'other') as Category;
-  const agent = (['travel', 'booking', 'experience'].includes(String(input.agent)) ? input.agent : 'travel') as AgentRole;
+  const agent = (['travel', 'booking', 'experience', 'custom'].includes(String(input.agent)) ? input.agent : 'travel') as AgentRole;
   if (!name) throw new ApiError(400, 'NAME_REQUIRED', 'Name the purchase.');
   if (!Number.isFinite(amount) || amount <= 0 || amount > 100000) {
     throw new ApiError(400, 'AMOUNT_INVALID', 'Enter an amount between 0 and 100,000.');

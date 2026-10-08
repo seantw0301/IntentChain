@@ -4,8 +4,7 @@ import { useState } from 'react';
 import type { AppState } from '@/lib/types';
 import type { Call } from '@/app/page';
 
-const EXAMPLE =
-  'I have a client meeting in Tokyo next week. Find me a hotel and an eSIM. Total budget: $600. This is a business trip.';
+import { EXAMPLE_PROMPT as EXAMPLE } from './GuideBar';
 
 export function IntentPanel({ state, call, busy }: { state: AppState; call: Call; busy: string | null }) {
   const [prompt, setPrompt] = useState(EXAMPLE);

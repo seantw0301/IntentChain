@@ -31,6 +31,8 @@ export function ActivityPanel({
   const [name, setName] = useState('Noise-cancelling headphones');
   const [amount, setAmount] = useState('60');
   const [category, setCategory] = useState('other');
+  const [buyer, setBuyer] = useState('travel');
+  const hasCustom = state.delegations.some((d) => d.agent === 'custom');
 
   const bought = new Set(state.transactions.map((t) => t.item.id));
   const delegated = new Set(state.delegations.map((d) => d.agent as string));
@@ -85,7 +87,7 @@ export function ActivityPanel({
             <summary>Try your own purchase</summary>
             <div className="form">
               <div className="wide">
-                <label htmlFor="c-name">What should the Travel Agent buy?</label>
+                <label htmlFor="c-name">What should the agent buy?</label>
                 <input id="c-name" type="text" value={name} maxLength={80} onChange={(e) => setName(e.target.value)} />
               </div>
               <div>
@@ -98,11 +100,20 @@ export function ActivityPanel({
                 <label htmlFor="c-amt">USD</label>
                 <input id="c-amt" type="number" min="1" value={amount} onChange={(e) => setAmount(e.target.value)} />
               </div>
+              {hasCustom && (
+                <div className="wide">
+                  <label htmlFor="c-buyer">Proposed by</label>
+                  <select id="c-buyer" value={buyer} onChange={(e) => setBuyer(e.target.value)}>
+                    <option value="travel">Travel Agent</option>
+                    <option value="custom">Your Agent (the task you delegated)</option>
+                  </select>
+                </div>
+              )}
               <div className="wide row end">
                 <button
                   className="btn small"
                   disabled={busy !== null || !name.trim() || !(Number(amount) > 0)}
-                  onClick={() => call('transaction/evaluate', { name, amount: Number(amount), category })}
+                  onClick={() => call('transaction/evaluate', { name, amount: Number(amount), category, agent: buyer })}
                 >
                   Propose
                 </button>

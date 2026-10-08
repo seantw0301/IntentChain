@@ -292,3 +292,27 @@ details.byo pre { margin: 8px 0; padding: 10px 12px; background: #0b1227; border
 .reconcile td { padding: 6px; border-top: 1px dashed rgba(36, 50, 92, 0.7); vertical-align: top; overflow-wrap: anywhere; }
 .reconcile td.ok { color: var(--pass); font-weight: 700; white-space: nowrap; }
 .reconcile td.no { color: var(--block); font-weight: 700; white-space: nowrap; }
+
+/* delegate your own task */
+.own-task { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+.own-task .row { flex-wrap: nowrap; }
+.own-task input[type='text'] { flex: 1 1 auto; min-width: 0; }
+.own-task input[type='number'] { flex: 0 0 84px; width: 84px; }
+@media (max-width: 620px) { .own-task .row { flex-wrap: wrap; } }
+
+/* guided walkthrough */
+.guide {
+  position: sticky; top: 8px; z-index: 10; margin-bottom: 16px; padding: 12px 16px; border-radius: var(--radius);
+  display: grid; grid-template-columns: 132px minmax(0, 1fr) auto; gap: 14px; align-items: center;
+  background: rgba(17, 25, 51, 0.94); backdrop-filter: blur(8px);
+  border: 1px solid var(--accent); box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+}
+.guide-progress { font-size: 12px; color: var(--muted); font-weight: 600; letter-spacing: 0.4px; }
+.guide-progress .bar { margin-top: 6px; }
+.guide-text { display: grid; gap: 2px; }
+.guide-text b { font-size: 16px; }
+.guide-text span { font-size: 13px; color: #c3cdec; }
+@media (max-width: 760px) {
+  .guide { grid-template-columns: minmax(0, 1fr); position: static; }
+}
+.grid:not(.two):not(.mid):not(.low) { grid-template-columns: minmax(0, 1fr); }

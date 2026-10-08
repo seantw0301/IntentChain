@@ -176,6 +176,7 @@ const AGENT_NAMES: Record<AgentRole, string> = {
   hotel: 'Hotel Agent',
   booking: 'Booking Agent',
   experience: 'Experience Agent',
+  custom: 'Your Agent',
   recovery: 'Recovery Agent',
 };
 

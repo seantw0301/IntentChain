@@ -6,7 +6,7 @@ export type Category =
   | 'subscription'
   | 'other';
 
-export type AgentRole = 'travel' | 'hotel' | 'booking' | 'experience' | 'recovery';
+export type AgentRole = 'travel' | 'hotel' | 'booking' | 'experience' | 'custom' | 'recovery';
 
 export type AiSource = 'jev' | 'cached';
 

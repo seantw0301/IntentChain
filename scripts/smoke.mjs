@@ -147,6 +147,17 @@ check('Test 4 — theme park $120: budget, authority, scope PASS; intent FAIL',
   check('gateway: an agent cannot read another agent\'s transaction', g.status === 404);
 }
 
+// a visitor delegates a task in their own words
+r = await api('POST', 'delegate', { task: 'Find fun things to do in the evenings', budget: 100 });
+const own = r.json.delegations?.findLast((x) => x.agent === 'custom');
+check('own task: accepted as a subset, scored, and flagged as drift',
+  r.status === 200 && own?.budget === 100 && own.drift === true && typeof own.fidelity?.score === 'number', JSON.stringify(r.json.error ?? own?.fidelity));
+r = await api('POST', 'delegate', { task: 'Arrange a taxi to the client office', budget: 60 });
+const onTask = r.json.delegations?.findLast((x) => x.agent === 'custom');
+check('own task: one that serves the goal is not flagged', r.status === 200 && onTask?.drift === false, JSON.stringify(onTask?.fidelity));
+r = await api('POST', 'delegate', { task: 'Arrange a taxi to the client office', budget: 9999 });
+check('own task: asking for more than the parent holds is rejected', r.status === 422 && r.json.error?.code === 'MONOTONIC_VIOLATION');
+
 // 4. hotel with decision provenance
 r = await api('POST', 'transaction/evaluate', { step: 'hotel' });
 tx = last(r.json);

@@ -5,6 +5,7 @@ import type { AppState } from '@/lib/types';
 import { ActivityPanel } from '@/components/ActivityPanel';
 import { AuditPanel } from '@/components/AuditPanel';
 import { ChainPanel } from '@/components/ChainPanel';
+import { GuideBar } from '@/components/GuideBar';
 import { IntentPanel } from '@/components/IntentPanel';
 import { ValidationCard } from '@/components/ValidationCard';
 
@@ -136,23 +137,26 @@ export default function Home() {
         </div>
       </section>
 
-      <div className="grid two">
+      <GuideBar state={state} call={call} busy={busy} />
+
+      {/* panels appear as the story reaches them, so the first screen stays simple */}
+      <div className={`grid ${state.delegations.length ? 'two' : ''}`}>
         <IntentPanel state={state} call={call} busy={busy} />
-        <ChainPanel state={state} call={call} busy={busy} />
+        {state.delegations.length > 0 && <ChainPanel state={state} call={call} busy={busy} />}
       </div>
 
-      <div className="grid mid">
-        <ActivityPanel state={state} call={call} busy={busy} active={active} />
-        <ValidationCard state={state} tx={focused} call={call} busy={busy} />
-      </div>
+      {active && (
+        <div className="grid mid">
+          <ActivityPanel state={state} call={call} busy={busy} active={active} />
+          <ValidationCard state={state} tx={focused} call={call} busy={busy} />
+        </div>
+      )}
 
-      <div className="grid low">
-        <AuditPanel state={state} focus={focused?.id ?? null} onFocus={setFocus} call={call} busy={busy} />
-        <section className="panel">
-          <h2>Audit timeline</h2>
-          {state.events.length === 0 ? (
-            <p className="empty">Every state change will be recorded here.</p>
-          ) : (
+      {state.events.length > 0 && (
+        <div className="grid low">
+          <AuditPanel state={state} focus={focused?.id ?? null} onFocus={setFocus} call={call} busy={busy} />
+          <section className="panel">
+            <h2>Audit timeline</h2>
             <ol className="timeline">
               {[...state.events].reverse().map((e) => (
                 <li key={e.seq}>
@@ -165,9 +169,9 @@ export default function Home() {
                 </li>
               ))}
             </ol>
-          )}
-        </section>
-      </div>
+          </section>
+        </div>
+      )}
 
       <p className="foot">
         IntentChain is a hackathon demo.{' '}

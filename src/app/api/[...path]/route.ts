@@ -2,7 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { proposeCustom, resolveWarning, runStep } from '@/lib/agents';
 import { snapshot } from '@/lib/audit';
 import { clearSession } from '@/lib/db';
-import { assessFidelity, attemptCapabilityEscalation, attemptForgery, createDelegation, delegateExperience } from '@/lib/delegation';
+import {
+  assessFidelity,
+  attemptCapabilityEscalation,
+  attemptForgery,
+  createDelegation,
+  delegateCustom,
+  delegateExperience,
+} from '@/lib/delegation';
 import { activeIntent, confirmIntent, createIntent } from '@/lib/intent';
 import { authenticate, callTool, toolsForGrant } from '@/lib/gateway';
 import { applyWebhook, capturePayment, createPayment, reconcile, reportOutcome } from '@/lib/payments';
@@ -35,6 +42,11 @@ const ROUTES: [string, string, Handler][] = [
     // scripted delegation events for the demo
     if (body.simulate === 'escalation') attemptCapabilityEscalation(session, intent);
     if (body.simulate === 'forgery') attemptForgery(session, intent);
+    if (typeof body.task === 'string') {
+      // a visitor delegates a task in their own words
+      await delegateCustom(session, intent, body.task, body.budget);
+      return snapshot(session);
+    }
     if (body.simulate === 'experience') {
       await delegateExperience(session, intent);
       return snapshot(session);
@@ -42,7 +54,7 @@ const ROUTES: [string, string, Handler][] = [
     const scope = body.scope as Record<string, unknown> | undefined;
     if (
       typeof body.parent !== 'string' ||
-      !['travel', 'hotel', 'booking', 'experience', 'recovery'].includes(String(body.agent)) ||
+      !['travel', 'hotel', 'booking', 'experience', 'custom', 'recovery'].includes(String(body.agent)) ||
       typeof body.budget !== 'number' ||
       typeof body.expires_at !== 'string' ||
       !scope ||

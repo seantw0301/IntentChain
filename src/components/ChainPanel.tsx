@@ -10,6 +10,7 @@ export const AGENT_NAMES: Record<string, string> = {
   hotel: 'Hotel Agent',
   booking: 'Booking Agent',
   experience: 'Experience Agent',
+  custom: 'Your Agent',
   recovery: 'Recovery Agent',
 };
 
@@ -75,8 +76,11 @@ function Node({ d, token }: { d: Delegation; token?: string }) {
 
 export function ChainPanel({ state, call, busy }: { state: AppState; call: Call; busy: string | null }) {
   const { intent, delegations } = state;
-  const main = delegations.filter((d) => d.agent !== 'experience');
-  const branches = delegations.filter((d) => d.agent === 'experience');
+  const [task, setTask] = useState('Find fun things to do in the evenings');
+  const [budget, setBudget] = useState('100');
+  const side = (d: Delegation) => d.agent === 'experience' || d.agent === 'custom';
+  const main = delegations.filter((d) => !side(d));
+  const branches = delegations.filter(side);
   // the most recent delegation attack, if any
   const attack = [...state.events].reverse().find((e) => e.type === 'delegation.rejected' || e.type === 'delegation.forged');
   const active = intent?.status === 'ACTIVE';
@@ -110,14 +114,31 @@ export function ChainPanel({ state, call, busy }: { state: AppState; call: Call;
                 {d.drift && <span className="drift-flag">⚠ INTENT DRIFT DETECTED</span>}
               </div>
               <Node d={d} token={state.grant_tokens?.[d.id]} />
-              {d.drift && (
+              {d.drift ? (
                 <p className="hint">
                   This grant is a valid subset of its parent — smaller budget, same place and dates — so no rule rejects it.
                   Only its purpose has moved away from “{intent.goal}”. Anything it tries to buy is traced back to this hop.
                 </p>
+              ) : (
+                <p className="hint">This task stays within “{intent.goal}”. The grant is signed and ready to use.</p>
               )}
             </div>
           ))}
+
+          <div className="own-task">
+            <label htmlFor="own-task">Delegate a task in your own words — the AI scores how far it drifts from your intent</label>
+            <div className="row">
+              <input id="own-task" type="text" value={task} maxLength={120} onChange={(e) => setTask(e.target.value)} />
+              <input aria-label="Budget in USD" type="number" min="1" value={budget} onChange={(e) => setBudget(e.target.value)} />
+              <button
+                className="btn small"
+                disabled={busy !== null || !active || task.trim().length < 4 || !(Number(budget) > 0)}
+                onClick={() => call('delegate', { task, budget: Number(budget) })}
+              >
+                Delegate
+              </button>
+            </div>
+          </div>
 
           <div className="row" style={{ marginTop: 12 }}>
             <span className="hint" style={{ marginRight: 'auto' }}>
