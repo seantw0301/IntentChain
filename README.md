@@ -1,7 +1,7 @@
-# IntentChain
+# IntentChain Business Agent
 
-**Autonomous travel & procurement for small businesses** — AI agents that book and buy through
-PayPal, inside limits the owner sets, checked at every hand-off between agents.
+**Trusted autonomous travel & procurement for small businesses** — AI agents that book and buy
+through PayPal, inside limits the owner sets, checked at every hand-off between agents.
 
 > Let AI spend. Keep your business in control.
 
@@ -21,7 +21,7 @@ pieces to other agents, which hand pieces on again. A purchase can be an allowed
 budget and within authority, and still not be what the employee was sent to do, because the task
 changed shape somewhere along the way.
 
-## What IntentChain does
+## What it does
 
 **For the owner:** set a spending policy once — what agents may buy, a trip budget, and an
 auto-pay limit. Connect PayPal once.
@@ -298,7 +298,7 @@ More detail: [docs/architecture.md](docs/architecture.md).
 
 Copyright (C) 2026 ChengYuan Chang
 
-IntentChain is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0).
+IntentChain Business Agent is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0).
 See [LICENSE](LICENSE).
 
 For closed-source or commercial use without AGPL obligations, a commercial license is available.

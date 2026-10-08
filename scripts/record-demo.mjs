@@ -22,7 +22,7 @@ const ORIGIN = (process.argv[2] || 'http://localhost:3100').replace(/\/$/, '');
 const APP = `${ORIGIN}/intentchain`;
 const OUT = path.resolve('video');
 const VOICE = process.env.VOICE || 'Samantha';
-const RATE = process.env.RATE || '178';
+const RATE = process.env.RATE || '184';
 const HEADED = process.env.HEADED === '1';
 const VIEW = { width: 1120, height: 630 }; // small viewport, recorded at 1080p, so text stays readable
 
@@ -55,10 +55,10 @@ const SCENES = [
   },
   {
     id: 'intro',
-    say: 'IntentChain: autonomous travel and procurement for small businesses, built on PayPal. Let AI spend. Keep your business in control.',
+    say: 'This is IntentChain Business Agent: trusted, autonomous travel and procurement for small businesses, built on PayPal. Let AI spend. Keep your business in control.',
     do: async (p) => {
-      await card(p, ['Ten people. No travel desk. No procurement team.', 'IntentChain', 'Let AI spend. Keep your business in control.']);
-      await sleep(8000);
+      await card(p, ['IntentChain Business Agent', 'Trusted autonomous travel & procurement for small businesses', 'Let AI spend. Keep your business in control.']);
+      await sleep(9000);
       await card(p, null);
     },
   },
@@ -140,8 +140,8 @@ const SCENES = [
     id: 'outcome',
     say: 'Then the hotel cancels. The payment succeeded. The goal did not. IntentChain refunds through PayPal, and proposes a replacement.',
     do: async (p) => {
-      await sleep(1200);
-      await guide(p, 5000);
+      await sleep(800);
+      await guide(p, 3500);
       await view(p, '.banner');
     },
   },
@@ -149,7 +149,7 @@ const SCENES = [
     id: 'reconcile',
     say: 'Every order and refund is read back from PayPal, and matched to our ledger.',
     do: async (p) => {
-      await guide(p, 3500);
+      await guide(p, 2500);
       await view(p, '.reconcile');
     },
   },
@@ -159,19 +159,19 @@ const SCENES = [
     do: async (p) => {
       await p.evaluate(() => window.scrollTo({ top: 0, behavior: 'smooth' }));
       await sleep(800);
-      await guide(p, 2500); // reset, then submit the office request
-      await guide(p, 1800); // confirm & delegate
-      await guide(p, 2500); // adapters → auto-pay
+      await guide(p, 1500); // reset, then submit the office request
+      await guide(p, 1200); // confirm & delegate
+      await guide(p, 1800); // adapters → auto-pay
       await view(p, '.checks');
-      await guide(p, 1800); // graphics card → blocked
+      await guide(p, 1200); // graphics card → blocked
       await view(p, '.checks');
     },
   },
   {
     id: 'outro',
-    say: 'Agents can delegate tasks. They should not be able to delegate away your intent. IntentChain. Trust the chain, not just the agent.',
+    say: 'Agents can delegate tasks. They should not be able to delegate away your intent. IntentChain Business Agent. Trust the chain, not just the agent.',
     do: async (p) => {
-      await card(p, ['IntentChain', 'Let AI spend. Keep your business in control.', 'Trust the chain, not just the agent.']);
+      await card(p, ['IntentChain Business Agent', 'Let AI spend. Keep your business in control.', 'Trust the chain, not just the agent.']);
       await sleep(8500);
     },
   },

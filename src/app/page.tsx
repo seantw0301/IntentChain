@@ -75,7 +75,7 @@ export default function Home() {
   if (!state) {
     return (
       <main className="shell">
-        <p className="empty">Loading IntentChain…</p>
+        <p className="empty">Loading IntentChain Business Agent…</p>
       </main>
     );
   }
@@ -90,8 +90,8 @@ export default function Home() {
         <div className="brand">
           <div className="logo" aria-hidden>IC</div>
           <div>
-            <h1>IntentChain</h1>
-            <p>Autonomous travel &amp; procurement for small businesses</p>
+            <h1>IntentChain Business Agent</h1>
+            <p>Trusted autonomous travel &amp; procurement for small businesses</p>
           </div>
         </div>
         <div className="badges">
@@ -130,7 +130,7 @@ export default function Home() {
         <div className="hero-main">
           <h2>Let AI spend. Keep your business in control.</h2>
           <p>
-            A ten-person company has no travel desk and no procurement team. IntentChain lets AI agents book and buy through
+            A ten-person company has no travel desk and no procurement team. IntentChain Business Agent lets AI agents book and buy through
             PayPal — inside limits the owner sets, and checked at <em>every hand-off between agents</em>.
           </p>
         </div>
@@ -191,7 +191,7 @@ export default function Home() {
       )}
 
       <p className="foot">
-        IntentChain is a hackathon demo.{' '}
+        IntentChain Business Agent is a hackathon demo.{' '}
         {state.config.paypal_mode === 'sandbox'
           ? 'Payments run in the PayPal sandbox through the PayPal Agent Toolkit — no real money moves.'
           : 'PayPal credentials are not configured on this server, so payments are simulated.'}{' '}
