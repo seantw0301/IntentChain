@@ -147,7 +147,7 @@ export default function Home() {
       </div>
 
       <div className="grid low">
-        <AuditPanel state={state} focus={focused?.id ?? null} onFocus={setFocus} />
+        <AuditPanel state={state} focus={focused?.id ?? null} onFocus={setFocus} call={call} busy={busy} />
         <section className="panel">
           <h2>Audit timeline</h2>
           {state.events.length === 0 ? (
@@ -215,6 +215,8 @@ function describe(type: string, d: Record<string, unknown>): string {
     case 'outcome.failed': return `Outcome failed — ${item} was cancelled`;
     case 'payment.refunded': return `Refunded${amount} for ${item}${d.mode === 'mock' ? ' (simulated)' : ''}`;
     case 'payment.refund_failed': return `Refund failed for ${item}`;
+    case 'audit.reconciled': return `Reconciled with PayPal — ${d.checked} checked, ${d.mismatches} mismatch${d.mismatches === 1 ? '' : 'es'}`;
+    case 'paypal.webhook': return `PayPal webhook ${String(d.event_type ?? '').toLowerCase()} for ${item}`;
     case 'recovery.proposed': return `Recovery proposed — ${d.replacement} $${d.amount}`;
     default: return type;
   }

@@ -280,3 +280,15 @@ details.lineage li.drifted { color: #ffb3ba; }
 .vs.us .vs-flow b { color: var(--pass); font-weight: 700; }
 @media (max-width: 940px) { .hero { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 620px) { .versus { grid-template-columns: minmax(0, 1fr); } }
+
+/* agent gateway and reconciliation */
+.node .token { margin-top: 8px; width: 100%; }
+details.byo { margin-top: 12px; font-size: 13px; }
+details.byo summary { cursor: pointer; color: var(--accent); }
+details.byo pre { margin: 8px 0; padding: 10px 12px; background: #0b1227; border: 1px solid var(--line); border-radius: 10px; overflow-x: auto; font-size: 12px; line-height: 1.5; }
+.reconcile { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+.reconcile table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
+.reconcile th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); font-weight: 600; padding: 4px 6px; }
+.reconcile td { padding: 6px; border-top: 1px dashed rgba(36, 50, 92, 0.7); vertical-align: top; overflow-wrap: anywhere; }
+.reconcile td.ok { color: var(--pass); font-weight: 700; white-space: nowrap; }
+.reconcile td.no { color: var(--block); font-weight: 700; white-space: nowrap; }

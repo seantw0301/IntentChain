@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import type { AppState, Delegation } from '@/lib/types';
 import type { Call } from '@/app/page';
 
@@ -33,7 +34,8 @@ function Fidelity({ d }: { d: Delegation }) {
   );
 }
 
-function Node({ d }: { d: Delegation }) {
+function Node({ d, token }: { d: Delegation; token?: string }) {
+  const [copied, setCopied] = useState(false);
   return (
     <div className={`node ${d.status !== 'ACTIVE' ? 'used' : ''} ${d.drift ? 'drifted' : ''}`}>
       <h3>{AGENT_NAMES[d.agent]}</h3>
@@ -54,6 +56,19 @@ function Node({ d }: { d: Delegation }) {
         {d.signature && <li title={d.signature}><b>Signed</b> <code>{d.signature.slice(0, 10)}…</code></li>}
         {d.status !== 'ACTIVE' && <li><b>Status</b> {d.status}</li>}
       </ul>
+      {token && (
+        <button
+          className="btn small ghost token"
+          title="Copy this grant as a token your own agent can use on the gateway"
+          onClick={async () => {
+            await navigator.clipboard?.writeText(token).catch(() => undefined);
+            setCopied(true);
+            window.setTimeout(() => setCopied(false), 1500);
+          }}
+        >
+          {copied ? 'Copied' : 'Copy agent token'}
+        </button>
+      )}
     </div>
   );
 }
@@ -65,6 +80,7 @@ export function ChainPanel({ state, call, busy }: { state: AppState; call: Call;
   // the most recent delegation attack, if any
   const attack = [...state.events].reverse().find((e) => e.type === 'delegation.rejected' || e.type === 'delegation.forged');
   const active = intent?.status === 'ACTIVE';
+  const origin = typeof window === 'undefined' ? '' : window.location.origin;
 
   return (
     <section className="panel">
@@ -84,7 +100,7 @@ export function ChainPanel({ state, call, busy }: { state: AppState; call: Call;
                 <li><b>Expiry</b> {intent.trip_end}</li>
               </ul>
             </div>
-            {main.map((d) => <Node key={d.id} d={d} />)}
+            {main.map((d) => <Node key={d.id} d={d} token={state.grant_tokens?.[d.id]} />)}
           </div>
 
           {branches.map((d) => (
@@ -93,7 +109,7 @@ export function ChainPanel({ state, call, busy }: { state: AppState; call: Call;
                 {AGENT_NAMES[d.from]} also delegated →
                 {d.drift && <span className="drift-flag">⚠ INTENT DRIFT DETECTED</span>}
               </div>
-              <Node d={d} />
+              <Node d={d} token={state.grant_tokens?.[d.id]} />
               {d.drift && (
                 <p className="hint">
                   This grant is a valid subset of its parent — smaller budget, same place and dates — so no rule rejects it.
@@ -124,6 +140,24 @@ export function ChainPanel({ state, call, busy }: { state: AppState; call: Call;
               Simulate forged grant
             </button>
           </div>
+
+          <details className="byo">
+            <summary>Bring your own agent — call PayPal through the firewall with a grant token</summary>
+            <p className="hint">
+              Any agent, in any language, can act under one of these grants. It sees only the PayPal tools the grant carries,
+              and every call passes the same four checks. Copy a token above, then:
+            </p>
+            <pre>{`# which tools does this grant carry?
+curl -H "Authorization: Bearer $TOKEN" ${origin}/intentchain/api/agent/tools
+
+# try to buy something — the firewall decides
+curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \\
+  -d '{"item_name":"Theme park ticket","amount_usd":120,"category":"entertainment"}' \\
+  ${origin}/intentchain/api/agent/tools/create_order`}</pre>
+            <p className="hint">
+              A complete LLM agent that does this is in <code>examples/claude-agent.mjs</code> in the repository.
+            </p>
+          </details>
 
           {attack?.type === 'delegation.rejected' && (
             <div className="note block">

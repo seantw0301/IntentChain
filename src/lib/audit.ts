@@ -80,9 +80,15 @@ export function snapshot(session: string): AppState {
   const intent = list<Intent>('intents', session).at(-1) ?? null;
   const transactions = list<Transaction>('transactions', session);
   const recoveries = list<Recovery>('recoveries', session);
+  const delegations = list<Delegation>('delegations', session);
   return {
     intent,
-    delegations: list<Delegation>('delegations', session),
+    delegations,
+    grant_tokens: Object.fromEntries(
+      delegations
+        .filter((d) => d.signature && d.paypal_tools.length)
+        .map((d) => [d.id, `ic_${Buffer.from(`${d.id}.${d.signature}`).toString('base64url')}`]),
+    ),
     transactions,
     decisions: list<Decision>('decisions', session),
     recoveries,

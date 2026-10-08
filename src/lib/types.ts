@@ -219,6 +219,8 @@ export interface AppState {
   recoveries: Recovery[];
   events: AuditEvent[];
   metrics: Metrics | null;
+  /** grant tokens for the agent gateway, by delegation id */
+  grant_tokens: Record<string, string>;
   config: {
     paypal_mode: 'sandbox' | 'mock';
     ai_mode: 'live' | 'cached';

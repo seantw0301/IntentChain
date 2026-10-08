@@ -4,7 +4,9 @@ import { snapshot } from '@/lib/audit';
 import { clearSession } from '@/lib/db';
 import { assessFidelity, attemptCapabilityEscalation, attemptForgery, createDelegation, delegateExperience } from '@/lib/delegation';
 import { activeIntent, confirmIntent, createIntent } from '@/lib/intent';
-import { capturePayment, createPayment, reportOutcome } from '@/lib/payments';
+import { authenticate, callTool, toolsForGrant } from '@/lib/gateway';
+import { applyWebhook, capturePayment, createPayment, reconcile, reportOutcome } from '@/lib/payments';
+import { verifyWebhook } from '@/lib/paypal';
 import { publicOrigin, sessionId } from '@/lib/session';
 import { ApiError } from '@/lib/types';
 
@@ -94,6 +96,11 @@ const ROUTES: [string, string, Handler][] = [
     return { ...snapshot(session), focus: tx.id };
   }],
 
+  ['POST', 'audit/reconcile', async ({ session }) => {
+    await reconcile(session);
+    return snapshot(session);
+  }],
+
   ['POST', 'demo/reset', ({ session }) => {
     if (process.env.DEMO_MODE === 'false') throw new ApiError(403, 'RESET_DISABLED', 'Reset is only available in demo mode.');
     clearSession(session);
@@ -112,25 +119,62 @@ function match(pattern: string, path: string[]): string[] | null {
   return params;
 }
 
+/** Reads a JSON object body, with a size cap. */
+async function jsonBody(req: NextRequest): Promise<Body> {
+  const text = await req.text();
+  if (text.length > 4000) throw new ApiError(413, 'BODY_TOO_LARGE', 'Request body too large.');
+  if (!text) return {};
+  try {
+    return JSON.parse(text) as Body;
+  } catch {
+    throw new ApiError(400, 'INVALID_JSON', 'Request body must be JSON.');
+  }
+}
+
+/**
+ * Agent gateway: for agents outside this app. Authenticated by a grant token
+ * (a signed delegation) rather than a browser session.
+ *   GET  agent/tools          the PayPal tools this grant carries
+ *   POST agent/tools/{name}   call one — through the firewall
+ */
+async function agentGateway(req: NextRequest, path: string[]): Promise<Response | null> {
+  if (path[0] !== 'agent' || path[1] !== 'tools') return null;
+  const grant = authenticate(req.headers.get('authorization'));
+  if (req.method === 'GET' && path.length === 2) {
+    return NextResponse.json({
+      agent: grant.delegation.agent,
+      intent: { id: grant.intent.id, goal: grant.intent.goal },
+      grant: { id: grant.delegation.id, task: grant.delegation.purpose, limit_usd: grant.delegation.budget },
+      tools: toolsForGrant(grant),
+    });
+  }
+  if (req.method === 'POST' && path.length === 3) {
+    return NextResponse.json(await callTool(grant, path[2], await jsonBody(req), await publicOrigin()));
+  }
+  return null;
+}
+
+/** PayPal webhook deliveries. Only events PayPal itself confirms as genuine are applied. */
+async function paypalWebhook(req: NextRequest, path: string[]): Promise<Response | null> {
+  if (req.method !== 'POST' || path.join('/') !== 'paypal/webhook') return null;
+  const raw = await req.text();
+  if (raw.length > 100000) throw new ApiError(413, 'BODY_TOO_LARGE', 'Request body too large.');
+  if (!(await verifyWebhook(req.headers, raw))) {
+    throw new ApiError(401, 'WEBHOOK_UNVERIFIED', 'PayPal did not verify this webhook delivery.');
+  }
+  return NextResponse.json({ applied: applyWebhook(JSON.parse(raw)) });
+}
+
 async function handle(req: NextRequest, path: string[]): Promise<Response> {
   try {
+    const special = (await paypalWebhook(req, path)) ?? (await agentGateway(req, path));
+    if (special) return special;
     for (const [method, pattern, handler] of ROUTES) {
       if (method !== req.method) continue;
       const params = match(pattern, path);
       if (!params) continue;
       const session = await sessionId();
-      let body: Body = {};
-      if (req.method === 'POST') {
-        const text = await req.text();
-        if (text.length > 4000) throw new ApiError(413, 'BODY_TOO_LARGE', 'Request body too large.');
-        if (text) {
-          try {
-            body = JSON.parse(text) as Body;
-          } catch {
-            throw new ApiError(400, 'INVALID_JSON', 'Request body must be JSON.');
-          }
-        }
-      }
+      const body: Body = req.method === 'POST' ? await jsonBody(req) : {};
       const out = await handler({ session, body, params, req });
       return out instanceof Response ? out : NextResponse.json(out);
     }

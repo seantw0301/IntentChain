@@ -1,7 +1,7 @@
 import { emit, spent } from './audit';
 import { ITEMS, RECOVERY_OPTION } from './catalog';
-import { get, list, newId, put } from './db';
-import { captureOrder, createOrder, orderStatus, paypalMode, refundCapture } from './paypal';
+import { findByPayPalId, get, list, newId, put } from './db';
+import { captureOrder, createOrder, orderStatus, paypalMode, readOrder, readRefund, refundCapture } from './paypal';
 import { asNoul, ask } from './jev';
 import { evaluate } from './validator';
 import { ApiError } from './types';
@@ -205,4 +205,95 @@ export async function reportOutcome(session: string, id: string, type: string): 
     await proposeRecovery(session, intent, tx);
   }
   return tx;
+}
+
+export interface ReconciliationRow {
+  transaction_id: string;
+  item: string;
+  amount: number;
+  local: string;
+  paypal: string;
+  match: boolean | null;
+}
+
+/**
+ * Reconciles the local ledger against PayPal: every transaction that reached
+ * PayPal is read back and its status compared with what IntentChain recorded.
+ */
+export async function reconcile(session: string): Promise<ReconciliationRow[]> {
+  const rows: ReconciliationRow[] = [];
+  let intentId: string | null = null;
+  for (const tx of list<Transaction>('transactions', session)) {
+    if (!tx.payment?.order_id) continue;
+    intentId = tx.intent_id;
+    const row: ReconciliationRow = {
+      transaction_id: tx.id,
+      item: tx.item.name,
+      amount: tx.item.amount,
+      local: tx.status,
+      paypal: 'simulated — nothing to reconcile',
+      match: null,
+    };
+    if (tx.payment.mode === 'sandbox') {
+      try {
+        const remote = await readOrder('recovery', tx.payment.order_id);
+        const refund = tx.payment.refund_id ? await readRefund('recovery', tx.payment.refund_id) : null;
+        row.paypal = [`order ${remote.order}`, remote.capture && `capture ${remote.capture}`, refund && `refund ${refund}`]
+          .filter(Boolean)
+          .join(' · ');
+        const paid = remote.order === 'COMPLETED' && (remote.capture === 'COMPLETED' || remote.capture === 'PENDING');
+        row.match =
+          tx.status === 'CAPTURED' || tx.status === 'OUTCOME_FAILED' || tx.status === 'REFUND_FAILED'
+            ? paid
+            : tx.status === 'REFUNDED'
+              ? remote.capture === 'REFUNDED' && refund === 'COMPLETED'
+              : tx.status === 'ORDER_CREATED'
+                ? remote.order !== 'COMPLETED'
+                : null;
+        if (remote.capture && remote.capture !== tx.payment.capture_status) {
+          tx.payment.capture_status = remote.capture;
+          save(session, tx);
+        }
+      } catch (err) {
+        row.paypal = `could not read from PayPal: ${(err as Error).message.slice(0, 120)}`;
+        row.match = false;
+      }
+    }
+    rows.push(row);
+  }
+  emit(session, 'audit.reconciled', 'audit', { intent_id: intentId }, {
+    rows,
+    checked: rows.filter((r) => r.match !== null).length,
+    mismatches: rows.filter((r) => r.match === false).length,
+  });
+  return rows;
+}
+
+/** Applies a verified PayPal webhook event to the transaction it belongs to. */
+export function applyWebhook(event: { event_type?: string; resource?: Record<string, any> }): boolean {
+  const resource = event.resource ?? {};
+  const type = String(event.event_type ?? '');
+  // capture events carry the capture id; refund events link "up" to the capture; order events carry the order id
+  const up = (resource.links as { rel: string; href: string }[] | undefined)?.find((l) => l.rel === 'up')?.href;
+  const candidates = [
+    resource.id,
+    resource.supplementary_data?.related_ids?.order_id,
+    up?.split('/').pop(),
+  ].filter((x): x is string => typeof x === 'string');
+  for (const id of candidates) {
+    const found = findByPayPalId(id);
+    if (!found) continue;
+    const tx = JSON.parse(found.data) as Transaction;
+    if (type.startsWith('PAYMENT.CAPTURE.') && tx.payment) {
+      tx.payment.capture_status = type === 'PAYMENT.CAPTURE.REFUNDED' ? 'REFUNDED' : String(resource.status ?? tx.payment.capture_status);
+      save(found.session, tx);
+    }
+    emit(found.session, 'paypal.webhook', 'paypal', { intent_id: tx.intent_id, transaction_id: tx.id }, {
+      item: tx.item.name,
+      event_type: type,
+      status: resource.status ?? null,
+    });
+    return true;
+  }
+  return false;
 }

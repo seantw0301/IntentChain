@@ -38,6 +38,7 @@ export function paypalMode(): 'sandbox' | 'mock' {
 
 type ToolMap = Record<string, { execute?: (args: unknown, opts: unknown) => Promise<unknown> }>;
 const toolkits = new Map<AgentRole, ToolMap>();
+let tokenSource: { getAccessToken(): Promise<string>; getBaseUrl(): string } | null = null;
 
 async function toolkit(role: AgentRole): Promise<ToolMap> {
   const cached = toolkits.get(role);
@@ -50,6 +51,7 @@ async function toolkit(role: AgentRole): Promise<ToolMap> {
     configuration: { actions: ROLE_ACTIONS[role], context: { sandbox: true } },
   });
   const tools = instance.getTools() as unknown as ToolMap;
+  tokenSource = instance.client;
   toolkits.set(role, tools);
   return tools;
 }
@@ -161,4 +163,56 @@ export async function refundCapture(
   });
   if (!out?.id) throw new Error('PayPal did not return a refund id.');
   return { refund_id: out.id };
+}
+
+export interface PayPalOrderState {
+  order: string;
+  capture: string | null;
+  capture_id: string | null;
+}
+
+/** Reads the order back from PayPal: its status and the status of its capture. */
+export async function readOrder(role: AgentRole, orderId: string): Promise<PayPalOrderState> {
+  const out = await call(role, 'get_order', { id: orderId });
+  const capture = out?.purchase_units?.[0]?.payments?.captures?.[0];
+  return { order: String(out?.status ?? 'UNKNOWN'), capture: capture?.status ?? null, capture_id: capture?.id ?? null };
+}
+
+export async function readRefund(role: AgentRole, refundId: string): Promise<string> {
+  const out = await call(role, 'get_refund', { refund_id: refundId });
+  return String(out?.status ?? 'UNKNOWN');
+}
+
+/**
+ * Asks PayPal whether a webhook delivery is genuine. Webhooks are not part of
+ * the Agent Toolkit, so this one call goes to the REST API directly, reusing the
+ * toolkit's sandbox client for the access token.
+ */
+export async function verifyWebhook(headers: Headers, rawBody: string): Promise<boolean> {
+  const webhookId = process.env.PAYPAL_WEBHOOK_ID;
+  if (!webhookId || paypalMode() !== 'sandbox') return false;
+  await toolkit('recovery');
+  if (!tokenSource) return false;
+  let event: unknown;
+  try {
+    event = JSON.parse(rawBody);
+  } catch {
+    return false;
+  }
+  const res = await fetch(`${tokenSource.getBaseUrl()}/v1/notifications/verify-webhook-signature`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${await tokenSource.getAccessToken()}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      auth_algo: headers.get('paypal-auth-algo'),
+      cert_url: headers.get('paypal-cert-url'),
+      transmission_id: headers.get('paypal-transmission-id'),
+      transmission_sig: headers.get('paypal-transmission-sig'),
+      transmission_time: headers.get('paypal-transmission-time'),
+      webhook_id: webhookId,
+      webhook_event: event,
+    }),
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!res.ok) return false;
+  return ((await res.json()) as { verification_status?: string }).verification_status === 'SUCCESS';
 }

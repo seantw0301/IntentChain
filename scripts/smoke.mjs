@@ -28,6 +28,16 @@ function client() {
 
 const last = (s) => s.transactions.at(-1);
 
+// the agent gateway authenticates with a grant token instead of a session cookie
+async function agent(token, path = '', body) {
+  const res = await fetch(`${API}/agent/tools${path}`, {
+    method: body ? 'POST' : 'GET',
+    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  return { status: res.status, json: await res.json() };
+}
+
 async function pay(api, id) {
   await api('POST', 'paypal/order', { transaction_id: id });
   return (await api('POST', 'paypal/capture', { transaction_id: id })).json;
@@ -110,6 +120,33 @@ check('Test 4 — theme park $120: budget, authority, scope PASS; intent FAIL',
   tx.validation.budget.pass && tx.validation.authority.pass && tx.validation.scope.pass && tx.validation.intent.status === 'fail',
   JSON.stringify(tx.validation));
 
+// agent gateway: an outside agent acting under a grant token
+{
+  const s = (await api('GET', 'audit')).json;
+  const tokenOf = (role) => s.grant_tokens[s.delegations.find((x) => x.agent === role).id];
+  let g = await agent(null);
+  check('gateway: no token, no access', g.status === 401);
+  g = await agent(`${tokenOf('travel').slice(0, -4)}AAAA`);
+  check('gateway: a tampered token is rejected', g.status === 401, JSON.stringify(g.json));
+  check('gateway: the Hotel Agent has no token at all (it holds no PayPal tools)',
+    s.grant_tokens[s.delegations.find((x) => x.agent === 'hotel').id] === undefined);
+  g = await agent(tokenOf('experience'));
+  check('gateway: a grant lists only its own PayPal tools',
+    g.status === 200 && g.json.agent === 'experience' && g.json.tools.some((t) => t.name === 'create_order'), JSON.stringify(g.json));
+  g = await agent(tokenOf('experience'), '/create_order', { item_name: 'Karaoke night', amount_usd: 60, category: 'entertainment' });
+  check('gateway: an outside agent is blocked by the same firewall, traced to the drifting hop',
+    g.status === 200 && g.json.blocked === true && g.json.reason_code === 'INTENT_MISMATCH' && /Experience Agent/.test(g.json.violation?.source ?? ''),
+    JSON.stringify(g.json));
+  g = await agent(tokenOf('experience'), '/create_refund', { transaction_id: 'x' });
+  check('gateway: a tool outside the grant is refused', g.status === 403 && g.json.error?.code === 'TOOL_NOT_GRANTED', JSON.stringify(g.json));
+  g = await agent(tokenOf('travel'), '/create_order', { item_name: 'Pocket Wi-Fi rental for the meeting days', amount_usd: 25, category: 'connectivity' });
+  check('gateway: a legitimate purchase gets a PayPal order',
+    g.status === 200 && g.json.blocked === false && (g.json.status === 'ORDER_CREATED' || g.json.status === 'WARNING'), JSON.stringify(g.json));
+  const theirs = g.json.transaction_id;
+  g = await agent(tokenOf('experience'), '/get_order', { transaction_id: theirs });
+  check('gateway: an agent cannot read another agent\'s transaction', g.status === 404);
+}
+
 // 4. hotel with decision provenance
 r = await api('POST', 'transaction/evaluate', { step: 'hotel' });
 tx = last(r.json);
@@ -142,6 +179,9 @@ if (mock) {
     s.metrics.authority_integrity === 100 && s.metrics.outcome_status === 'Recovery Active', JSON.stringify(s.metrics));
   if (s.config.ai_mode === 'cached') check('dashboard: intent integrity 94%', s.metrics.intent_integrity === 94, `${s.metrics.intent_integrity}`);
   check('every audit event carries the intent id', s.events.every((e) => e.intent_id === intent.id));
+  r = await api('POST', 'audit/reconcile');
+  const recon = r.json.events.findLast((e) => e.type === 'audit.reconciled');
+  check('reconciliation lists every transaction that reached PayPal', r.status === 200 && recon?.data.rows.length >= 2, JSON.stringify(recon?.data));
 } else {
   console.log('  skip  payment, budget and outcome steps (a sandbox order needs a human buyer)');
 }

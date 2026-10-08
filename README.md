@@ -79,23 +79,60 @@ signing), the **airport transfer** (relevant but over budget) and **Try your own
 
 ## How PayPal is used
 
-All PayPal access goes through the [PayPal Agent Toolkit](https://github.com/paypal/agent-toolkit)
+All payment actions go through the [PayPal Agent Toolkit](https://github.com/paypal/agent-toolkit)
 (`@paypal/agent-toolkit`), in the sandbox:
 
 | Toolkit tool | Used for |
 |---|---|
-| `create_order` | Creating the order once a transaction is approved. The intent id, agent and transaction id are written into the order's line-item description |
-| `get_order` | Checking the buyer approved before capturing — a capture is never retried blindly |
+| `create_order` | Creating the order once the firewall approves. The intent id, agent and transaction id are written into the order's line-item description, so the PayPal record itself links back to the human intent |
+| `get_order` | Checking the buyer approved before capturing — a capture is never retried blindly — and reading orders back for reconciliation |
 | `pay_order` | Capturing the payment |
 | `create_refund` | Refunding when the outcome fails |
+| `get_refund` | Confirming the refund during reconciliation |
 
 Each agent role gets its own toolkit instance with only the actions it is allowed
 ([`src/lib/paypal.ts`](src/lib/paypal.ts)), so PayPal permissions narrow along the delegation
 chain exactly as spending authority does. Sandbox mode is hard-wired; the app cannot reach live
 PayPal.
 
-The buyer approval step is real: you are redirected to the PayPal sandbox, approve with a sandbox
+**Buyer approval is real.** You are redirected to the PayPal sandbox, approve with a sandbox
 personal account, and are returned to the app, which then captures.
+
+**Reconciliation.** *Reconcile with PayPal* reads every order and refund back from PayPal and
+compares it with IntentChain's own ledger, row by row.
+
+**Webhooks.** `POST /intentchain/api/paypal/webhook` accepts PayPal deliveries, asks PayPal to
+verify each signature, and only then updates the transaction and the audit timeline. Webhooks are
+not part of the Agent Toolkit, so signature verification is the one direct REST call in the app.
+
+## Bring your own agent
+
+The firewall is not tied to the scripted demo agents. Any agent — any language, any model — can
+act under a grant through the **agent gateway**:
+
+```bash
+# which PayPal tools does this grant carry?
+curl -H "Authorization: Bearer $TOKEN" https://demo.jxdtw.com/intentchain/api/agent/tools
+
+# try to buy something; the firewall decides
+curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"item_name":"Theme park ticket","amount_usd":120,"category":"entertainment"}' \
+  https://demo.jxdtw.com/intentchain/api/agent/tools/create_order
+```
+
+`$TOKEN` is a **grant token**: a signed delegation, copied from the chain with *Copy agent token*.
+The gateway verifies the signature chain, lists only the tools that grant carries (the Hotel Agent
+has no token because it has no PayPal tools), runs the same four checks, and lets an agent see
+only the transactions made under its own grant.
+
+[`examples/claude-agent.mjs`](examples/claude-agent.mjs) is a complete LLM agent built on this:
+Claude chooses the tool calls, the gateway decides what reaches PayPal.
+
+```bash
+export INTENTCHAIN_TOKEN=ic_…      # copied from the demo
+export ANTHROPIC_API_KEY=…
+node examples/claude-agent.mjs "Buy a theme park day ticket for $120."
+```
 
 ## How AI is used
 
@@ -167,6 +204,10 @@ All paths are under `/intentchain/api`. Every `POST` returns the full, fresh sta
 | `POST` | `/paypal/capture` | `{ transaction_id }` |
 | `POST` | `/outcome/event` | `{ transaction_id, type: "booking_cancelled" }` |
 | `GET` | `/audit` | — |
+| `POST` | `/audit/reconcile` | — compares the ledger with PayPal |
+| `GET` | `/agent/tools` | grant token in `Authorization` — the tools this grant carries |
+| `POST` | `/agent/tools/{name}` | grant token — call a PayPal tool through the firewall |
+| `POST` | `/paypal/webhook` | PayPal deliveries, signature-verified |
 | `POST` | `/demo/reset` | — clears your own session |
 
 ## Project layout
@@ -180,10 +221,12 @@ src/lib/
   validator.ts      the four checks
   agents.ts         agent workflows and decision provenance
   paypal.ts         PayPal Agent Toolkit access, per-role permissions
-  payments.ts       order, capture, refund, outcome and recovery
+  payments.ts       order, capture, refund, outcome, recovery, reconciliation, webhooks
+  gateway.ts        agent gateway: grant tokens and guarded PayPal tools
   jev.ts            AI client
   audit.ts          event log and dashboard metrics
   db.ts             SQLite storage, keyed by browser session
+examples/           a real LLM agent that pays through the gateway
 scripts/            install, start, smoke test, reset
 docs/               architecture notes
 ```
@@ -192,7 +235,9 @@ More detail: [docs/architecture.md](docs/architecture.md).
 
 ## Tools used
 
-- **PayPal Agent Toolkit** and the PayPal sandbox — orders, captures, refunds
+- **PayPal Agent Toolkit** and the PayPal sandbox — orders, captures, refunds, reconciliation
+- **PayPal Webhooks** — signature-verified payment events
+- **Claude** (Anthropic SDK) — the example bring-your-own agent
 - **JEV (TypeSafe System One)** — intent extraction and alignment scoring
 - **Next.js / React / TypeScript** — UI and API in one app
 - **SQLite** (`node:sqlite`) — storage

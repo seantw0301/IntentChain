@@ -150,3 +150,20 @@ export function signingKey(): string {
   db().prepare("INSERT OR IGNORE INTO meta (key, value) VALUES ('delegation_secret', ?)").run(value);
   return (db().prepare("SELECT value FROM meta WHERE key = 'delegation_secret'").get() as { value: string }).value;
 }
+
+/** Finds the transaction that owns a PayPal order or capture id, in any session (used by webhooks). */
+export function findByPayPalId(id: string): { session: string; data: string } | null {
+  if (!/^[A-Za-z0-9_-]{8,40}$/.test(id)) return null;
+  const row = db()
+    .prepare("SELECT session_id, data FROM transactions WHERE data LIKE ? OR data LIKE ? LIMIT 1")
+    .get(`%"order_id":"${id}"%`, `%"capture_id":"${id}"%`) as { session_id: string; data: string } | undefined;
+  return row ? { session: row.session_id, data: row.data } : null;
+}
+
+/** Which session a delegation belongs to (grant tokens carry the grant id, never the session id). */
+export function sessionOfDelegation(id: string): string | null {
+  const row = db().prepare('SELECT session_id FROM delegations WHERE id = ? LIMIT 1').get(id) as
+    | { session_id: string }
+    | undefined;
+  return row?.session_id ?? null;
+}
