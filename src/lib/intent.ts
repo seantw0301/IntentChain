@@ -148,7 +148,7 @@ export async function createIntent(session: string, prompt: string): Promise<Int
 }
 
 /** The human confirms the structured intent; only then is authority delegated. */
-export function confirmIntent(session: string, id: string): { intent: Intent; delegations: Delegation[] } {
+export async function confirmIntent(session: string, id: string): Promise<{ intent: Intent; delegations: Delegation[] }> {
   const intent = get<Intent>('intents', session, id);
   if (!intent) throw new ApiError(404, 'INTENT_NOT_FOUND', 'Intent not found.');
   if (intent.status === 'ACTIVE') {
@@ -157,7 +157,7 @@ export function confirmIntent(session: string, id: string): { intent: Intent; de
   intent.status = 'ACTIVE';
   put('intents', session, intent);
   emit(session, 'intent.confirmed', 'human', { intent_id: intent.id }, {});
-  return { intent, delegations: buildChain(session, intent) };
+  return { intent, delegations: await buildChain(session, intent) };
 }
 
 export function activeIntent(session: string): Intent {

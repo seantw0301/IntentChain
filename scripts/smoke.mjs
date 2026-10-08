@@ -59,8 +59,19 @@ check('delegation chain narrows: 600 → 500 → 180/night',
   d?.length === 3 && d[0].budget === 600 && d[1].budget === 500 && d[2].per_night === 180, JSON.stringify(d?.map((x) => [x.agent, x.budget, x.per_night])));
 check('Hotel Agent holds no PayPal tools', d?.[1]?.paypal_tools?.length === 0);
 
+check('every grant is signed and scored for intent fidelity',
+  d?.every((x) => /^[a-f0-9]{64}$/.test(x.signature) && typeof x.fidelity?.score === 'number' && !x.drift),
+  JSON.stringify(d?.map((x) => [x.agent, x.fidelity?.score, x.drift])));
+
 r = await api('POST', 'delegate', { simulate: 'escalation' });
-check('escalation attempt is rejected (monotonic delegation)', r.status === 422 && r.json.error?.code === 'MONOTONIC_VIOLATION');
+check('delegation attack rejected: same amount, one extra capability',
+  r.status === 422 && r.json.error?.code === 'MONOTONIC_VIOLATION' && /entertainment/.test(r.json.error.message) && !/Budget/.test(r.json.error.message),
+  JSON.stringify(r.json.error));
+r = await api('POST', 'delegate', { simulate: 'forgery' });
+check('forged grant rejected: signature chain does not verify',
+  r.status === 422 && r.json.error?.code === 'CHAIN_SIGNATURE_INVALID', JSON.stringify(r.json.error));
+r = await api('GET', 'audit');
+check('rejected and forged grants were never stored', r.json.delegations.length === 3);
 
 // 1. legitimate purchase
 r = await api('POST', 'transaction/evaluate', { step: 'esim' });
@@ -79,12 +90,21 @@ tx = last(r.json);
 check('Test 3 — luxury hotel $780 blocked: authority exceeded',
   tx.status === 'BLOCKED' && tx.validation.reason_code === 'AUTHORITY_EXCEEDED' && tx.validation.intent.status === 'skipped',
   JSON.stringify(tx.validation));
+check('responsibility: the Booking Agent is named as the source', tx.validation.violation?.source === 'Booking Agent', JSON.stringify(tx.validation.violation));
 r = await api('POST', 'paypal/order', { transaction_id: tx.id });
 check('a blocked transaction can never reach PayPal', r.status === 409);
 
-// 3. intent drift — the key case
+// 3. intent drift across hops — the key case
+r = await api('POST', 'delegate', { simulate: 'experience' });
+const exp = r.json.delegations?.find((x) => x.agent === 'experience');
+check('drifting delegation is a valid subset, so it is accepted', r.status === 200 && exp?.budget === 150 && exp?.parent === d[0].id, JSON.stringify(r.json.error ?? exp));
+check('…but its purpose is flagged as intent drift', exp?.drift === true && exp.fidelity.score < 65, JSON.stringify(exp?.fidelity));
 r = await api('POST', 'transaction/evaluate', { step: 'theme-park' });
 tx = last(r.json);
+check('theme park is proposed by the Experience Agent over a verified 2-hop chain', tx.agent === 'experience' && tx.validation.chain_hops === 2);
+check('responsibility: traced to the Travel → Experience delegation hop',
+  /Travel Agent → Experience Agent/.test(tx.validation.violation?.source ?? '') && /Intent drift/.test(tx.validation.violation?.type ?? '') && tx.validation.violation.delegation_id === exp?.id,
+  JSON.stringify(tx.validation.violation));
 check('Test 4 — theme park $120: budget, authority, scope PASS; intent FAIL',
   tx.status === 'BLOCKED' && tx.validation.reason_code === 'INTENT_MISMATCH' &&
   tx.validation.budget.pass && tx.validation.authority.pass && tx.validation.scope.pass && tx.validation.intent.status === 'fail',

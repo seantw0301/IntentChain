@@ -2,9 +2,9 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'IntentChain — Verifiable Human Intent for Agentic Commerce',
+  title: 'IntentChain — Intent Integrity Firewall for Multi-Agent Commerce',
   description:
-    'A trust layer between AI agents and PayPal. Every AI payment must prove why it was allowed.',
+    'When agents delegate to agents, IntentChain verifies the whole chain still serves what the human asked for — before a payment reaches PayPal.',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

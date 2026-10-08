@@ -4,10 +4,13 @@ import { useState } from 'react';
 import type { AppState } from '@/lib/types';
 import type { Call } from '@/app/page';
 
-const STEPS = [
+type Step = { key: string; item?: string; title: string; who: string; price?: number; delegate?: string };
+
+const STEPS: Step[] = [
   { key: 'esim', item: 'esim', title: 'Japan eSIM', who: 'Travel Agent', price: 18 },
-  { key: 'luxury-hotel', item: 'luxury-hotel', title: 'Luxury hotel', who: 'Booking Agent goes off-script', price: 780 },
-  { key: 'theme-park', item: 'theme-park', title: 'Theme park ticket', who: 'Travel Agent drifts from the goal', price: 120 },
+  { key: 'luxury-hotel', item: 'luxury-hotel', title: 'Luxury hotel', who: 'Booking Agent goes over its limit', price: 780 },
+  { key: 'experience', delegate: 'experience', title: 'Delegate “improve the travel experience”', who: 'Travel Agent → Experience Agent' },
+  { key: 'theme-park', item: 'theme-park', title: 'Theme park ticket', who: 'Experience Agent', price: 120 },
   { key: 'hotel', item: 'hotel-b', title: 'Compare hotels and book', who: 'Hotel Agent → Booking Agent', price: 486 },
   { key: 'airport-transfer', item: 'airport-transfer', title: 'Airport transfer', who: 'Travel Agent', price: 110 },
 ];
@@ -29,8 +32,10 @@ export function ActivityPanel({
   const [amount, setAmount] = useState('60');
   const [category, setCategory] = useState('other');
 
-  const done = new Set(state.transactions.map((t) => t.item.id));
-  const next = STEPS.find((s) => !done.has(s.item))?.key;
+  const bought = new Set(state.transactions.map((t) => t.item.id));
+  const delegated = new Set(state.delegations.map((d) => d.agent as string));
+  const isDone = (s: Step) => (s.item ? bought.has(s.item) : delegated.has(s.delegate as string));
+  const next = STEPS.find((s) => !isDone(s))?.key;
   // an approved transaction should be paid before the story moves on
   const unpaid = state.transactions.some((t) => t.status === 'APPROVED' || t.status === 'ORDER_CREATED');
   const hotel = state.transactions.find((t) => t.item.id === 'hotel-b' && t.status === 'CAPTURED');
@@ -48,14 +53,16 @@ export function ActivityPanel({
                 key={s.key}
                 className={`stepbtn ${s.key === next && !unpaid ? 'next' : ''}`}
                 disabled={busy !== null}
-                onClick={() => call('transaction/evaluate', { step: s.key })}
+                onClick={() =>
+                  s.delegate ? call('delegate', { simulate: s.delegate }) : call('transaction/evaluate', { step: s.key })
+                }
               >
-                <span className="n">{done.has(s.item) ? '✓' : i + 1}</span>
+                <span className="n">{isDone(s) ? '✓' : i + 1}</span>
                 <span className="t">
                   {s.title}
                   <span className="s">{s.who}</span>
                 </span>
-                <span className="p">${s.price}</span>
+                <span className="p">{s.price !== undefined ? `$${s.price}` : '↳'}</span>
               </button>
             ))}
             <button
@@ -64,7 +71,7 @@ export function ActivityPanel({
               onClick={() => hotel && call('outcome/event', { transaction_id: hotel.id, type: 'booking_cancelled' })}
               title={hotel ? '' : 'Available after the hotel payment is captured'}
             >
-              <span className="n">6</span>
+              <span className="n">7</span>
               <span className="t">
                 Hotel cancels the booking
                 <span className="s">Outcome event after payment</span>

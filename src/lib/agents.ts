@@ -1,7 +1,7 @@
 import { emit } from './audit';
 import { CATEGORIES, HOTEL_OPTIONS, ITEMS } from './catalog';
 import { get, newId, put } from './db';
-import { createDelegation, delegationFor } from './delegation';
+import { delegateExperience, delegationFor } from './delegation';
 import { activeIntent } from './intent';
 import { asChoice, ask } from './jev';
 import { evaluate } from './validator';
@@ -15,7 +15,7 @@ import type { AgentRole, CatalogItem, Category, Decision, DecisionOption, Intent
 export const SCENARIO: Record<string, { agent: AgentRole; item: string; label: string }> = {
   esim: { agent: 'travel', item: 'esim', label: 'Travel Agent buys a Japan eSIM' },
   'luxury-hotel': { agent: 'booking', item: 'luxury-hotel', label: 'Booking Agent tries a luxury hotel' },
-  'theme-park': { agent: 'travel', item: 'theme-park', label: 'Travel Agent adds a theme park ticket' },
+  'theme-park': { agent: 'experience', item: 'theme-park', label: 'Experience Agent adds a theme park ticket' },
   hotel: { agent: 'booking', item: 'hotel-b', label: 'Hotel Agent compares hotels, Booking Agent books' },
   'airport-transfer': { agent: 'travel', item: 'airport-transfer', label: 'Travel Agent adds an airport transfer' },
 };
@@ -148,6 +148,8 @@ export async function runStep(session: string, step: string): Promise<Transactio
     const decision = await selectHotel(session, intent);
     return propose(session, intent, 'booking', ITEMS[decision.selected_item_id], decision.id);
   }
+  // the theme park ticket comes from the Experience Agent, at the end of a drifting chain
+  if (s.agent === 'experience') await delegateExperience(session, intent);
   return propose(session, intent, s.agent, ITEMS[s.item]);
 }
 
@@ -160,7 +162,7 @@ export async function proposeCustom(
   const name = String(input.name ?? '').trim().slice(0, 80);
   const amount = Number(input.amount);
   const category = String(input.category ?? 'other') as Category;
-  const agent = (['travel', 'booking'].includes(String(input.agent)) ? input.agent : 'travel') as AgentRole;
+  const agent = (['travel', 'booking', 'experience'].includes(String(input.agent)) ? input.agent : 'travel') as AgentRole;
   if (!name) throw new ApiError(400, 'NAME_REQUIRED', 'Name the purchase.');
   if (!Number.isFinite(amount) || amount <= 0 || amount > 100000) {
     throw new ApiError(400, 'AMOUNT_INVALID', 'Enter an amount between 0 and 100,000.');
@@ -178,22 +180,6 @@ export async function proposeCustom(
     nights: category === 'lodging' ? intent.nights : undefined,
   };
   return propose(session, intent, agent, item);
-}
-
-/** Demonstrates monotonic delegation: the Booking Agent tries to hand out more than it holds. */
-export function attemptEscalation(session: string): never {
-  const intent = activeIntent(session);
-  const booking = delegationFor(session, 'booking');
-  if (!booking) throw new ApiError(409, 'NO_DELEGATION', 'No booking delegation exists.');
-  createDelegation(session, intent, {
-    parent: booking.id,
-    agent: 'booking',
-    purpose: 'Re-delegate the full trip budget',
-    budget: intent.budget + 400,
-    scope: { location: intent.location, from: intent.trip_start, to: intent.trip_end },
-    expires_at: `${intent.trip_end}T23:59:59.000Z`,
-  });
-  throw new ApiError(500, 'ESCALATION_SUCCEEDED', 'Escalation unexpectedly succeeded.');
 }
 
 /** A human resolves a WARNING: approve it for payment, or reject it. */

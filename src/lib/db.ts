@@ -45,6 +45,7 @@ function open(): Database {
     last_seen TEXT NOT NULL,
     ai_calls INTEGER NOT NULL DEFAULT 0
   )`);
+  db.exec('CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)');
   db.exec(`CREATE TABLE IF NOT EXISTS ai_usage (
     day TEXT PRIMARY KEY,
     calls INTEGER NOT NULL DEFAULT 0
@@ -136,4 +137,16 @@ export function reserveAiCall(session: string): boolean {
     )
     .run(day);
   return true;
+}
+
+/** Server-side signing key for delegation grants. Generated once and kept in the database. */
+export function signingKey(): string {
+  if (process.env.DELEGATION_SECRET) return process.env.DELEGATION_SECRET;
+  const row = db().prepare("SELECT value FROM meta WHERE key = 'delegation_secret'").get() as
+    | { value: string }
+    | undefined;
+  if (row) return row.value;
+  const value = crypto.randomBytes(32).toString('hex');
+  db().prepare("INSERT OR IGNORE INTO meta (key, value) VALUES ('delegation_secret', ?)").run(value);
+  return (db().prepare("SELECT value FROM meta WHERE key = 'delegation_secret'").get() as { value: string }).value;
 }

@@ -51,14 +51,30 @@ When a rule check fails the AI is not called at all.
 ```
 Human $600
   └─ Travel Agent   $600   lodging ≤ $500, connectivity ≤ $40     tools: create_order, get_order, pay_order
-       └─ Hotel Agent    $500   lodging only, until check-in      tools: none
-            └─ Booking Agent  $180/night, max $500, 30 min, single use   tools: create_order, get_order, pay_order
+       ├─ Hotel Agent    $500   lodging only, until check-in      tools: none
+       │    └─ Booking Agent  $180/night, max $500, 30 min, single use   tools: create_order, get_order, pay_order
+       └─ Experience Agent  $150  "improve the overall travel experience"  tools: create_order, get_order, pay_order
 Recovery Agent (started by an outcome event)                      tools: get_order, create_refund, get_refund
 ```
 
-`monotonicViolations()` in [`src/lib/delegation.ts`](../src/lib/delegation.ts) rejects any grant
-that exceeds its parent in amount, per-night rate, location, dates, categories or expiry, and any
-attempt to re-delegate a single-use grant.
+Three mechanisms act on this chain, all in [`src/lib/delegation.ts`](../src/lib/delegation.ts).
+
+**Monotonic rule.** `monotonicViolations()` rejects any grant that exceeds its parent in amount,
+per-night rate, location, dates, categories or expiry, and any attempt to re-delegate a single-use
+grant. New categories are reported separately as *new capabilities*, so an escalation that leaves
+the amount untouched is still caught.
+
+**Signed chain.** A grant's signature is `HMAC(key, session | parent signature | this grant's
+limits)`. The root signature is derived from the intent. Before any transaction is evaluated,
+`verifyChain()` walks from the agent's grant to the root, re-derives every signature top-down and
+re-checks the subset relation. A grant whose limits were edited after signing fails, as does a
+grant with no signed parent. A failed chain fails the Authority check.
+
+**Intent fidelity.** `assessFidelity()` rates each grant's stated task against the human intent on
+a five-level rubric, scaled to 0–100. Below 65 the grant is marked as drifted. Drift does not
+reject the grant — it is structurally valid — but it is recorded, shown on the chain, and used for
+attribution: when a purchase made under that grant fails the Intent check, the violation source is
+the delegation hop where the drift began, not the last agent in line.
 
 PayPal permissions follow the same shape. Each role has its own PayPal Agent Toolkit instance,
 constructed with only that role's `actions`; a call to a tool the role was not granted is refused

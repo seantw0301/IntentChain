@@ -1,8 +1,8 @@
 # IntentChain
 
-**Verifiable Human Intent for Agentic Commerce** — a trust layer between AI agents and PayPal.
+**An intent integrity firewall for multi-agent commerce**, built on PayPal.
 
-> Budget tells an AI how much it can spend. IntentChain tells it *why* it is allowed to spend.
+> Trust the chain, not just the agent.
 
 Live demo: **https://demo.jxdtw.com/intentchain**
 
@@ -10,55 +10,72 @@ Built for the PayPal AI Hackathon.
 
 ## The problem
 
-AI agents are starting to spend money for us. Today's guardrails are spending limits: if the
-purchase fits the budget, it goes through. But a budget does not know what the money was *for*.
+Agentic commerce is not one agent with a wallet. One agent breaks the job down and hands pieces
+to other agents, and those agents hand pieces on again. Every hand-off is a chance for the
+original request to change: a little more authority here, a slightly broader task there.
 
-Ask an agent to arrange a $600 business trip, and a $120 theme park ticket fits the budget just
-as well as the hotel does. When one agent delegates to another, the problem compounds: nothing
-stops authority from quietly growing on its way down the chain.
+Spending limits and policy rules check the last step — is this payment allowed? They do not
+check the path that led to it. So what happens when an agent delegates your task to another
+agent, and that one delegates it again? Who makes sure it is still what you asked for?
 
 ## What IntentChain does
 
-IntentChain sits between the agents and PayPal. An agent cannot reach a PayPal tool until its
-proposed transaction passes four independent checks:
+IntentChain sits between the agents and PayPal and verifies the **whole delegation chain** before
+any PayPal tool can be called.
+
+**1. Authority can only shrink.** Every grant from one agent to the next must be a subset of its
+parent in amount, per-night rate, place, dates, categories and lifetime. A grant that asks for one
+extra capability is rejected at the moment of delegation, even when the amount is unchanged.
+
+**2. The chain is signed.** Each grant is HMAC-signed over its own limits *and its parent's
+signature*, back to the human intent. A grant that was altered or invented does not verify, and
+the transaction is refused.
+
+**3. PayPal permissions shrink with it.** Each agent role has its own PayPal Agent Toolkit
+instance with only the tools it was granted. The Hotel Agent can search but holds no PayPal tools.
+The Recovery Agent can refund but cannot pay.
+
+**4. Intent drift is measured at every hop.** A grant can be a perfectly valid subset and still
+carry a task the human never asked for. Each grant's stated purpose is scored against the original
+intent, so drift is caught where it starts — and anything bought further down is traced back to
+that hop.
+
+**5. Four independent checks gate each payment.**
 
 | Check | Question | Decided by |
 |---|---|---|
 | **Budget** | Is there money left? | Rule |
-| **Authority** | May *this* agent spend this much? | Rule |
+| **Authority** | May *this* agent spend this much, over a chain that verifies? | Rule + signatures |
 | **Scope** | Right place, right dates? | Rule |
 | **Intent** | Does this purchase serve the human's original goal? | Stated restrictions + AI |
 
 The AI can block a payment or send it to a human for review. It can never approve one by itself.
 
-Four ideas make this work:
+**6. Payment is not the finish line.** If the hotel cancels after a successful payment, the
+transaction is marked *outcome failed*, refunded through PayPal, and a replacement is proposed
+that needs fresh human approval.
 
-- **Intent lineage** — the human's request becomes a structured intent with an id. Every
-  delegation, decision, transaction and audit event carries that id, and it is written into the
-  PayPal order itself.
-- **Monotonic delegation** — each grant must be a subset of its parent in amount, scope, lifetime
-  and PayPal permissions. The Hotel Agent holds no PayPal tools at all; the Recovery Agent can
-  refund but not pay.
-- **Decision provenance** — before money moves, the agent records which options it rejected and why.
-- **Outcome accountability** — a captured payment is not a success until the goal is met. If the
-  hotel cancels, the payment is marked *outcome failed*, refunded, and a replacement is proposed
-  that needs fresh human approval.
+Every step is written to an audit log keyed by the intent id, and each transaction can show its
+full lineage: human intent → each signed grant → the decision → the payment.
 
 ## The demo story
 
 Open the demo and follow the numbered steps.
 
-| # | Agent action | Result | What it shows |
+| # | What happens | Result | What it shows |
 |---|---|---|---|
-| 1 | Japan eSIM, $18 | **Approved → paid** | A legitimate purchase flows straight through to PayPal |
-| 2 | Luxury hotel, $780 | **Blocked** — authority exceeded | An agent cannot exceed its delegated limit |
-| 3 | Theme park ticket, $120 | **Blocked** — intent mismatch | Budget, authority and scope all pass. Only intent catches it |
-| 4 | Compare hotels, book Hotel B, $486 | **Approved → paid** | "Why this payment?" shows the rejected alternatives |
-| 5 | Airport transfer, $110 | **Blocked** — budget exceeded | Relevant, but not affordable — the mirror image of step 3 |
-| 6 | Hotel cancels the booking | **Outcome failed → refunded → recovery** | Payment success is not intent success |
+| 1 | Confirm the intent | Chain of three signed grants, each narrower than the last | Authority and PayPal tools shrink per hop |
+| 2 | Travel Agent buys a Japan eSIM, $18 | **Approved → paid** | A legitimate purchase flows straight to PayPal |
+| 3 | **Simulate delegation attack** | **Delegation rejected** | Same amount, one extra capability — not a subset |
+| 4 | Booking Agent tries a luxury hotel, $780 | **Blocked** — authority exceeded | The agent is named as the source |
+| 5 | Travel Agent delegates “improve the overall travel experience” | **Accepted, flagged as intent drift** | Structurally valid, semantically off |
+| 6 | Experience Agent buys a theme park ticket, $120 | **Blocked** — intent mismatch | Budget, authority and scope all pass. Traced back to the drifting hop |
+| 7 | Compare hotels, book Hotel B, $486 | **Approved → paid** | “Why this payment?” shows the rejected alternatives |
+| 8 | Hotel cancels the booking | **Outcome failed → refunded → recovery** | Payment success is not intent success |
 
-Also try **Simulate escalation attempt** (an agent tries to hand out more authority than it holds)
-and **Try your own purchase** (propose anything and watch the four checks).
+Also try **Simulate forged grant** (an agent presents a grant whose limit was raised after
+signing), the **airport transfer** (relevant but over budget) and **Try your own purchase**
+(propose anything and watch the four checks).
 
 ## How PayPal is used
 
@@ -87,6 +104,7 @@ state object:
 
 - **Intent extraction** — classifies what the trip is for and where it goes. Amounts are parsed by rule, never taken from the AI.
 - **Intent alignment** — rates how strongly a purchase serves the stated purpose against a five-level rubric. The expected level, scaled to 0–100, is the alignment score: 65+ passes, 40–64 needs human review, below 40 is blocked. Merchant-supplied text is passed as untrusted data.
+- **Intent fidelity per hop** — rates how faithfully each grant's stated task stays within the human intent. Below 65 is flagged as drift.
 - **Independent review** — the AI separately picks the best hotel and rates the recovery proposal, and the result is recorded next to the rule-based decision.
 
 The agents themselves are deterministic orchestrators: code runs the workflow, the AI supplies
@@ -142,7 +160,7 @@ All paths are under `/intentchain/api`. Every `POST` returns the full, fresh sta
 |---|---|---|
 | `POST` | `/intent` | `{ prompt }` |
 | `POST` | `/intent/{id}/confirm` | — |
-| `POST` | `/delegate` | `{ parent, agent, budget, scope, expires_at }` — rejected with `422` if not a subset of the parent |
+| `POST` | `/delegate` | `{ parent, agent, budget, scope, expires_at }` — rejected with `422` if not a subset of the parent. `{ simulate: "escalation" \| "forgery" \| "experience" }` runs the scripted delegation events |
 | `POST` | `/transaction/evaluate` | `{ step }` or `{ name, amount, category }` |
 | `POST` | `/transaction/{id}/confirm` | `{ approve }` — resolves a human-review warning |
 | `POST` | `/paypal/order` | `{ transaction_id }` — only for approved transactions |
@@ -158,7 +176,7 @@ src/app/            UI and the API route
 src/components/     UI panels
 src/lib/
   intent.ts         intent extraction and confirmation
-  delegation.ts     delegation chain and the monotonic rule
+  delegation.ts     monotonic rule, signed chain, intent fidelity per hop
   validator.ts      the four checks
   agents.ts         agent workflows and decision provenance
   paypal.ts         PayPal Agent Toolkit access, per-role permissions
@@ -184,6 +202,7 @@ More detail: [docs/architecture.md](docs/architecture.md).
 - Hotels and products are fixed demo data; there is no live product search.
 - One scenario (a short business trip) is scripted. Custom purchases let you go off-script.
 - Recovery stops at a proposal awaiting human approval; it does not pay for the replacement.
+- Grants are signed with a server-held HMAC key. Agents here run inside one process; in a real deployment each agent would hold its own key.
 - No accounts: each browser session gets isolated state that is discarded after 24 idle hours.
 
 ## License

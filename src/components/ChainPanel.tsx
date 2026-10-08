@@ -1,13 +1,14 @@
 'use client';
 
-import { Fragment } from 'react';
 import type { AppState, Delegation } from '@/lib/types';
 import type { Call } from '@/app/page';
 
-const NAMES: Record<string, string> = {
+export const AGENT_NAMES: Record<string, string> = {
+  human: 'You',
   travel: 'Travel Agent',
   hotel: 'Hotel Agent',
   booking: 'Booking Agent',
+  experience: 'Experience Agent',
   recovery: 'Recovery Agent',
 };
 
@@ -18,9 +19,52 @@ function expiry(d: Delegation): string {
   return d.expires_at.slice(0, 10);
 }
 
+function Fidelity({ d }: { d: Delegation }) {
+  if (!d.fidelity) return null;
+  const tone = d.drift ? 'drift' : 'ok';
+  return (
+    <div className={`fidelity ${tone}`} title="How faithfully this grant's purpose stays within your original intent">
+      <span>
+        Intent fidelity <b>{d.fidelity.score}%</b>
+        <span className={`tag ${d.fidelity.source}`}>{d.fidelity.source === 'jev' ? 'AI' : 'cached'}</span>
+      </span>
+      <span className="bar"><i style={{ width: `${d.fidelity.score}%` }} /></span>
+    </div>
+  );
+}
+
+function Node({ d }: { d: Delegation }) {
+  return (
+    <div className={`node ${d.status !== 'ACTIVE' ? 'used' : ''} ${d.drift ? 'drifted' : ''}`}>
+      <h3>{AGENT_NAMES[d.agent]}</h3>
+      <div className="amount">
+        ${d.per_night ?? d.budget}
+        {d.per_night !== undefined && <small> /night</small>}
+      </div>
+      <Fidelity d={d} />
+      <ul>
+        <li><b>Task</b> “{d.purpose}”</li>
+        {d.per_night !== undefined && <li><b>Total</b> max ${d.budget}</li>}
+        <li><b>Scope</b> {d.scope.location}{d.scope.categories ? `, ${d.scope.categories.join(', ')} only` : ''}</li>
+        <li><b>Expiry</b> {expiry(d)}{d.single_use ? ' · single use' : ''}</li>
+        <li>
+          <b>PayPal tools</b> {d.paypal_tools.length === 0 && 'none'}
+          <span className="tools">{d.paypal_tools.map((t) => <code key={t}>{t}</code>)}</span>
+        </li>
+        {d.signature && <li title={d.signature}><b>Signed</b> <code>{d.signature.slice(0, 10)}…</code></li>}
+        {d.status !== 'ACTIVE' && <li><b>Status</b> {d.status}</li>}
+      </ul>
+    </div>
+  );
+}
+
 export function ChainPanel({ state, call, busy }: { state: AppState; call: Call; busy: string | null }) {
   const { intent, delegations } = state;
-  const rejected = [...state.events].reverse().find((e) => e.type === 'delegation.rejected');
+  const main = delegations.filter((d) => d.agent !== 'experience');
+  const branches = delegations.filter((d) => d.agent === 'experience');
+  // the most recent delegation attack, if any
+  const attack = [...state.events].reverse().find((e) => e.type === 'delegation.rejected' || e.type === 'delegation.forged');
+  const active = intent?.status === 'ACTIVE';
 
   return (
     <section className="panel">
@@ -34,51 +78,72 @@ export function ChainPanel({ state, call, busy }: { state: AppState; call: Call;
               <h3>You</h3>
               <div className="amount">${intent.budget}</div>
               <ul>
+                <li><b>Goal</b> “{intent.goal}”</li>
                 <li><b>Purpose</b> {intent.purpose_detail}</li>
                 <li><b>Scope</b> {intent.location}</li>
                 <li><b>Expiry</b> {intent.trip_end}</li>
               </ul>
             </div>
-            {delegations.map((d) => (
-              <Fragment key={d.id}>
-                <div className={`node ${d.status !== 'ACTIVE' ? 'used' : ''}`}>
-                  <h3>{NAMES[d.agent]}</h3>
-                  <div className="amount">
-                    ${d.per_night ?? d.budget}
-                    {d.per_night !== undefined && <small> /night</small>}
-                  </div>
-                  <ul>
-                    <li><b>Purpose</b> {d.purpose}</li>
-                    {d.per_night !== undefined && <li><b>Total</b> max ${d.budget}</li>}
-                    <li><b>Scope</b> {d.scope.location}{d.scope.categories ? `, ${d.scope.categories.join(', ')}` : ''}</li>
-                    <li><b>Expiry</b> {expiry(d)}{d.single_use ? ' · single use' : ''}</li>
-                    <li>
-                      <b>PayPal tools</b> {d.paypal_tools.length === 0 && 'none'}
-                      <span className="tools">{d.paypal_tools.map((t) => <code key={t}>{t}</code>)}</span>
-                    </li>
-                    {d.status !== 'ACTIVE' && <li><b>Status</b> {d.status}</li>}
-                  </ul>
-                </div>
-              </Fragment>
-            ))}
+            {main.map((d) => <Node key={d.id} d={d} />)}
           </div>
+
+          {branches.map((d) => (
+            <div className="branch" key={d.id}>
+              <div className="branch-from">
+                {AGENT_NAMES[d.from]} also delegated →
+                {d.drift && <span className="drift-flag">⚠ INTENT DRIFT DETECTED</span>}
+              </div>
+              <Node d={d} />
+              {d.drift && (
+                <p className="hint">
+                  This grant is a valid subset of its parent — smaller budget, same place and dates — so no rule rejects it.
+                  Only its purpose has moved away from “{intent.goal}”. Anything it tries to buy is traced back to this hop.
+                </p>
+              )}
+            </div>
+          ))}
+
           <div className="row" style={{ marginTop: 12 }}>
             <span className="hint" style={{ marginRight: 'auto' }}>
-              Each grant must be a subset of its parent: amount, scope, expiry and PayPal tools.
+              Every grant is signed over its parent&apos;s signature and must be a subset of it.
             </span>
             <button
               className="btn small ghost"
-              disabled={busy !== null || intent.status !== 'ACTIVE'}
+              disabled={busy !== null || !active}
               onClick={() => call('delegate', { simulate: 'escalation' })}
-              title="The Booking Agent tries to hand out more authority than it holds"
+              title="A Booking grant is requested with one extra capability. The amount is unchanged."
             >
-              Simulate escalation attempt
+              Simulate delegation attack
+            </button>
+            <button
+              className="btn small ghost"
+              disabled={busy !== null || !active}
+              onClick={() => call('delegate', { simulate: 'forgery' })}
+              title="An agent presents a grant whose limit was raised after it was signed"
+            >
+              Simulate forged grant
             </button>
           </div>
-          {rejected && (
+
+          {attack?.type === 'delegation.rejected' && (
             <div className="note block">
-              <b>DELEGATION REJECTED.</b> The Booking Agent tried to grant ${String(rejected.data.requested_budget)} while holding
-              ${String(rejected.data.parent_budget)}. {(rejected.data.violations as string[]).join(' ')}
+              <b>DELEGATION REJECTED.</b>{' '}
+              {(attack.data.new_capabilities as string[] | undefined)?.length ? (
+                <>
+                  New capability detected: <b>{(attack.data.new_capabilities as string[]).join(', ')}</b>. The requested amount
+                  (${String(attack.data.requested_budget)}) was within the parent limit — the child scope is simply not a subset of
+                  the {AGENT_NAMES[String(attack.data.parent_agent)]}&apos;s authority.
+                </>
+              ) : (
+                (attack.data.violations as string[]).join(' ')
+              )}
+            </div>
+          )}
+          {attack?.type === 'delegation.forged' && (
+            <div className="note block">
+              <b>FORGED GRANT REJECTED.</b> The {AGENT_NAMES[String(attack.data.agent)]} claimed a limit of $
+              {String(attack.data.claimed_budget)}; the signed grant says ${String(attack.data.signed_budget)}.{' '}
+              {String(attack.data.reason)}
             </div>
           )}
         </>

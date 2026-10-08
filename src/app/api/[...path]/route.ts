@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { attemptEscalation, proposeCustom, resolveWarning, runStep } from '@/lib/agents';
+import { proposeCustom, resolveWarning, runStep } from '@/lib/agents';
 import { snapshot } from '@/lib/audit';
 import { clearSession } from '@/lib/db';
-import { createDelegation } from '@/lib/delegation';
+import { assessFidelity, attemptCapabilityEscalation, attemptForgery, createDelegation, delegateExperience } from '@/lib/delegation';
 import { activeIntent, confirmIntent, createIntent } from '@/lib/intent';
 import { capturePayment, createPayment, reportOutcome } from '@/lib/payments';
 import { publicOrigin, sessionId } from '@/lib/session';
@@ -23,18 +23,24 @@ const ROUTES: [string, string, Handler][] = [
     await createIntent(session, String(body.prompt ?? ''));
     return snapshot(session);
   }],
-  ['POST', 'intent/:id/confirm', ({ session, params }) => {
-    confirmIntent(session, params[0]);
+  ['POST', 'intent/:id/confirm', async ({ session, params }) => {
+    await confirmIntent(session, params[0]);
     return snapshot(session);
   }],
 
-  ['POST', 'delegate', ({ session, body }) => {
-    if (body.simulate === 'escalation') attemptEscalation(session);
+  ['POST', 'delegate', async ({ session, body }) => {
     const intent = activeIntent(session);
+    // scripted delegation events for the demo
+    if (body.simulate === 'escalation') attemptCapabilityEscalation(session, intent);
+    if (body.simulate === 'forgery') attemptForgery(session, intent);
+    if (body.simulate === 'experience') {
+      await delegateExperience(session, intent);
+      return snapshot(session);
+    }
     const scope = body.scope as Record<string, unknown> | undefined;
     if (
       typeof body.parent !== 'string' ||
-      !['travel', 'hotel', 'booking', 'recovery'].includes(String(body.agent)) ||
+      !['travel', 'hotel', 'booking', 'experience', 'recovery'].includes(String(body.agent)) ||
       typeof body.budget !== 'number' ||
       typeof body.expires_at !== 'string' ||
       !scope ||
@@ -44,7 +50,8 @@ const ROUTES: [string, string, Handler][] = [
     ) {
       throw new ApiError(400, 'INVALID_DELEGATION', 'Required: parent, agent, budget, expires_at, scope { location, from, to }.');
     }
-    createDelegation(session, intent, { ...body, purpose: String(body.purpose ?? 'Custom grant') } as never);
+    const created = createDelegation(session, intent, { ...body, purpose: String(body.purpose ?? 'Custom grant').slice(0, 120) } as never);
+    await assessFidelity(session, intent, created);
     return snapshot(session);
   }],
 

@@ -89,7 +89,7 @@ export default function Home() {
           <div className="logo" aria-hidden>IC</div>
           <div>
             <h1>IntentChain</h1>
-            <p>Every AI payment should prove why it was allowed.</p>
+            <p>Intent integrity firewall for multi-agent commerce</p>
           </div>
         </div>
         <div className="badges">
@@ -113,6 +113,28 @@ export default function Home() {
           Reset demo
         </button>
       </header>
+
+      <section className="hero" aria-label="What makes IntentChain different">
+        <div className="hero-main">
+          <h2>Trust the chain, not just the agent.</h2>
+          <p>
+            Your agent delegates to another agent. That one delegates again. IntentChain verifies every hop still
+            carries what <em>you</em> asked for — before a payment reaches PayPal.
+          </p>
+        </div>
+        <div className="versus">
+          <div className="vs them">
+            <span className="vs-label">Payment guardrails ask</span>
+            <span className="vs-q">“Is this agent allowed to make this payment?”</span>
+            <span className="vs-flow">Intent → Agent → Pay</span>
+          </div>
+          <div className="vs us">
+            <span className="vs-label">IntentChain asks</span>
+            <span className="vs-q">“After three hand-offs, is this still what the human authorized?”</span>
+            <span className="vs-flow">Intent → Agent → Agent → Agent → <b>verify the whole chain</b> → Pay</span>
+          </div>
+        </div>
+      </section>
 
       <div className="grid two">
         <IntentPanel state={state} call={call} busy={busy} />
@@ -161,8 +183,8 @@ export default function Home() {
 }
 
 function tone(type: string): string {
-  if (type.endsWith('.blocked') || type.endsWith('failed') || type.endsWith('.rejected')) return 'block';
-  if (type.endsWith('.warning')) return 'warn';
+  if (type.endsWith('.blocked') || type.endsWith('failed') || type.endsWith('.rejected') || type.endsWith('.forged')) return 'block';
+  if (type.endsWith('.warning') || type.endsWith('.drift')) return 'warn';
   if (type.endsWith('.approved') || type.endsWith('.captured') || type.endsWith('.refunded')) return 'pass';
   return 'info';
 }
@@ -174,7 +196,14 @@ function describe(type: string, d: Record<string, unknown>): string {
     case 'intent.created': return `Intent created — ${d.goal}, $${d.budget}`;
     case 'intent.confirmed': return 'Intent confirmed by the human';
     case 'delegation.created': return `Delegated to ${d.agent} agent — up to $${d.budget}`;
-    case 'delegation.rejected': return `Delegation rejected — requested $${d.requested_budget}, parent holds $${d.parent_budget}`;
+    case 'delegation.rejected': {
+      const added = (d.new_capabilities as string[] | undefined) ?? [];
+      return added.length
+        ? `Delegation rejected — new capability: ${added.join(', ')}`
+        : `Delegation rejected — requested $${d.requested_budget}, parent holds $${d.parent_budget}`;
+    }
+    case 'delegation.drift': return `Intent drift detected — ${d.agent} agent's task scores ${d.fidelity}% fidelity`;
+    case 'delegation.forged': return `Forged grant rejected — claimed $${d.claimed_budget}, signed $${d.signed_budget}`;
     case 'decision.recorded': return `Decision recorded — selected ${d.selected}`;
     case 'transaction.proposed': return `Proposed ${item}${amount}`;
     case 'transaction.approved': return `${item}${amount} approved`;

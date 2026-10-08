@@ -1,7 +1,7 @@
 import { spent } from './audit';
 import { referenceReason, referenceScore } from './catalog';
 import { list } from './db';
-import { chainOf, delegationFor } from './delegation';
+import { delegationFor, verifyChain } from './delegation';
 import { asChoice, asScore, ask } from './jev';
 import type {
   AgentRole,
@@ -12,6 +12,7 @@ import type {
   IntentCheck,
   Transaction,
   Validation,
+  Violation,
 } from './types';
 
 const usd = (n: number) => `$${Number.isInteger(n) ? n : n.toFixed(2)}`;
@@ -170,10 +171,18 @@ async function checkIntent(session: string, intent: Intent, item: CatalogItem): 
   return { status, score, detail: `${reason} · Alignment ${score}`, restriction: null, source };
 }
 
+const AGENT_NAMES: Record<AgentRole, string> = {
+  travel: 'Travel Agent',
+  hotel: 'Hotel Agent',
+  booking: 'Booking Agent',
+  experience: 'Experience Agent',
+  recovery: 'Recovery Agent',
+};
+
 /**
- * The gate between an agent and PayPal. Rule checks run first; the AI is only
- * consulted when they pass, and it can block or downgrade but never approve a
- * payment on its own.
+ * The firewall between an agent and PayPal. The signed delegation chain is
+ * verified first, then the rule checks run; the AI is only consulted when they
+ * pass, and it can block or downgrade but never approve a payment on its own.
  */
 export async function evaluate(
   session: string,
@@ -183,10 +192,14 @@ export async function evaluate(
 ): Promise<{ validation: Validation; delegation: Delegation | null }> {
   const transactions = list<Transaction>('transactions', session);
   const delegation = delegationFor(session, agent);
-  const chain = delegation ? chainOf(session, delegation) : [];
+  const verified = delegation ? verifyChain(session, intent, delegation) : null;
+  const chain = verified?.ok ? verified.chain : [];
 
   const budget = checkBudget(intent, item, spent(transactions));
-  const authority = checkAuthority(agent, delegation, chain, item);
+  const authority: Check =
+    verified && !verified.ok
+      ? { pass: false, detail: verified.reason }
+      : checkAuthority(agent, delegation, chain, item);
   const scope = checkScope(intent, item);
 
   let intentCheck: IntentCheck = {
@@ -200,33 +213,66 @@ export async function evaluate(
     intentCheck = await checkIntent(session, intent, item);
   }
 
+  // responsibility: which agent, or which hop of the chain, introduced the problem
+  const who = AGENT_NAMES[agent];
+  const blame = (type: string): Violation => ({ source: who, type, delegation_id: delegation?.id ?? null });
+  const drifted = chain.find((d) => d.drift);
+
   let decision: Validation['decision'] = 'APPROVED';
   let reason_code: Validation['reason_code'] = 'OK';
   let headline = 'All four checks passed.';
+  let violation: Violation | undefined;
   if (!authority.pass) {
     decision = 'BLOCKED';
     reason_code = 'AUTHORITY_EXCEEDED';
     headline = `Authority exceeded. ${authority.detail}.`;
+    violation = blame(verified && !verified.ok ? 'Forged or altered grant' : 'Authority exceeded');
   } else if (!budget.pass) {
     decision = 'BLOCKED';
     reason_code = 'BUDGET_EXCEEDED';
     headline = `Budget exceeded. ${budget.detail}.`;
+    violation = blame('Budget exceeded');
   } else if (!scope.pass) {
     decision = 'BLOCKED';
     reason_code = 'OUT_OF_SCOPE';
     headline = `Out of scope. ${scope.detail}.`;
+    violation = blame('Out of scope');
   } else if (intentCheck.status === 'fail') {
     decision = 'BLOCKED';
     reason_code = 'INTENT_MISMATCH';
-    headline = `This purchase fits the budget, but not the original ${intent.purpose}-trip intent.`;
+    headline = `This purchase fits the budget, the authority and the scope — but not the original ${intent.purpose}-trip intent.`;
+    violation = drifted
+      ? {
+          source: `${drifted.from === 'human' ? 'Human' : AGENT_NAMES[drifted.from]} → ${AGENT_NAMES[drifted.agent]} delegation`,
+          type: `Intent drift (fidelity ${drifted.fidelity?.score ?? '?'}%)`,
+          delegation_id: drifted.id,
+        }
+      : blame('Intent mismatch');
   } else if (intentCheck.status === 'warning') {
     decision = 'WARNING';
     reason_code = 'NEEDS_HUMAN_REVIEW';
     headline = 'The link to the original intent is unclear. A human must confirm before payment.';
+    violation = drifted
+      ? {
+          source: `${drifted.from === 'human' ? 'Human' : AGENT_NAMES[drifted.from]} → ${AGENT_NAMES[drifted.agent]} delegation`,
+          type: `Intent drift (fidelity ${drifted.fidelity?.score ?? '?'}%)`,
+          delegation_id: drifted.id,
+        }
+      : undefined;
   }
 
   return {
-    validation: { budget, authority, scope, intent: intentCheck, decision, reason_code, headline },
+    validation: {
+      budget,
+      authority,
+      scope,
+      intent: intentCheck,
+      decision,
+      reason_code,
+      headline,
+      violation,
+      chain_hops: chain.length || undefined,
+    },
     delegation,
   };
 }

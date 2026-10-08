@@ -6,7 +6,7 @@ export type Category =
   | 'subscription'
   | 'other';
 
-export type AgentRole = 'travel' | 'hotel' | 'booking' | 'recovery';
+export type AgentRole = 'travel' | 'hotel' | 'booking' | 'experience' | 'recovery';
 
 export type AiSource = 'jev' | 'cached';
 
@@ -56,7 +56,20 @@ export interface Delegation {
   single_use: boolean;
   status: 'ACTIVE' | 'USED' | 'EXPIRED' | 'REVOKED';
   paypal_tools: string[];
+  /** HMAC over this grant's constraints and its parent's signature */
+  signature: string;
+  /** how faithfully this grant's purpose stays within the human intent, 0–100 */
+  fidelity?: { score: number; source: AiSource };
+  /** true when the purpose has drifted away from the human intent */
+  drift?: boolean;
   created_at: string;
+}
+
+export interface Violation {
+  /** who introduced the problem: an agent, or a delegation hop */
+  source: string;
+  type: string;
+  delegation_id: string | null;
 }
 
 export interface CatalogItem {
@@ -102,6 +115,10 @@ export interface Validation {
     | 'NEEDS_HUMAN_REVIEW'
     | 'REJECTED_BY_HUMAN';
   headline: string;
+  /** set on anything that is not approved: where in the chain it went wrong */
+  violation?: Violation;
+  /** number of signed delegation hops verified for this transaction */
+  chain_hops?: number;
 }
 
 export type TxStatus =

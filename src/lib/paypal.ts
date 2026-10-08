@@ -12,6 +12,7 @@ const ROLE_ACTIONS: Record<AgentRole, Actions> = {
   travel: { orders: { create: true, get: true, capture: true } },
   hotel: {},
   booking: { orders: { create: true, get: true, capture: true } },
+  experience: { orders: { create: true, get: true, capture: true } },
   recovery: { orders: { get: true }, payments: { createRefund: true, getRefunds: true } },
 };
 

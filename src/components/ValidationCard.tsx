@@ -4,12 +4,7 @@ import { useState } from 'react';
 import type { AppState, Check, Transaction } from '@/lib/types';
 import type { Call } from '@/app/page';
 
-const AGENT: Record<string, string> = {
-  travel: 'Travel Agent',
-  hotel: 'Hotel Agent',
-  booking: 'Booking Agent',
-  recovery: 'Recovery Agent',
-};
+import { AGENT_NAMES as AGENT } from './ChainPanel';
 
 function RuleCheck({ name, check }: { name: string; check: Check }) {
   return (
@@ -38,9 +33,9 @@ export function ValidationCard({
   if (!tx) {
     return (
       <section className="panel">
-        <h2><span className="step">4</span>Transaction validation</h2>
+        <h2><span className="step">4</span>IntentChain firewall</h2>
         <p className="empty">
-          Each purchase an agent proposes is checked here — before any PayPal tool is called.
+          Each purchase an agent proposes is checked against the whole delegation chain here — before any PayPal tool is called.
         </p>
       </section>
     );
@@ -51,6 +46,13 @@ export function ValidationCard({
   const recovery = state.recoveries.find((r) => r.failed_transaction_id === tx.id);
   const simulated = tx.payment?.mode === 'mock';
   const intentState = { pass: 'PASS', fail: 'FAIL', warning: 'REVIEW', skipped: '—' }[v.intent.status];
+
+  // lineage: the transaction's grant and every ancestor, root first
+  const byId = new Map(state.delegations.map((d) => [d.id, d]));
+  const lineage = [];
+  for (let d = tx.delegation_id ? byId.get(tx.delegation_id) : undefined; d; d = d.parent === 'human' ? undefined : byId.get(d.parent)) {
+    lineage.unshift(d);
+  }
 
   const pay = async () => {
     const ok = await call('paypal/order', { transaction_id: tx.id });
@@ -86,7 +88,7 @@ export function ValidationCard({
 
   return (
     <section className="panel">
-      <h2><span className="step">4</span>Transaction validation</h2>
+      <h2><span className="step">4</span>IntentChain firewall</h2>
       <div className="verdict">
         <div className="what">
           <h3>{tx.item.name}</h3>
@@ -142,6 +144,39 @@ export function ValidationCard({
           )}
         </span>
       </div>
+
+      {v.violation && tx.status !== 'APPROVED' && (
+        <div className="meta responsibility">
+          <span>Violation source <b>{v.violation.source}</b></span>
+          <span>Type <b>{v.violation.type}</b></span>
+          {v.violation.delegation_id && <span>Grant <code>{v.violation.delegation_id}</code></span>}
+        </div>
+      )}
+
+      <details className="lineage">
+        <summary>
+          Intent lineage — {lineage.length} signed hop{lineage.length === 1 ? '' : 's'} back to the human intent
+        </summary>
+        <ol>
+          <li>
+            <b>Human intent</b> <code>{tx.intent_id}</code> — “{state.intent?.goal}”
+          </li>
+          {lineage.map((d) => (
+            <li key={d.id} className={d.drift ? 'drifted' : ''}>
+              <b>{AGENT[d.from]} → {AGENT[d.agent]}</b> <code>{d.id}</code> — “{d.purpose}”, up to ${d.budget}
+              {d.fidelity && <> · fidelity {d.fidelity.score}%{d.drift ? ' ⚠ drift' : ''}</>}
+            </li>
+          ))}
+          {decision && (
+            <li>
+              <b>Decision</b> <code>{decision.id}</code> — {decision.options.length} options compared, 1 selected
+            </li>
+          )}
+          <li>
+            <b>Transaction</b> <code>{tx.id}</code> — {tx.item.name}, ${tx.item.amount} → {tx.status.replace(/_/g, ' ')}
+          </li>
+        </ol>
+      </details>
 
       {tx.payment?.order_id && (
         <div className="meta">
