@@ -101,6 +101,11 @@ export default function Home() {
           <span className={`badge ${state.config.ai_mode === 'live' ? 'live' : 'sim'}`}>
             Intent AI: <b>{state.config.ai_mode === 'live' ? 'Live' : 'Cached reference scores'}</b>
           </span>
+          {state.config.agent_model && (
+            <span className="badge live">
+              Agent LLM: <b>{state.config.agent_model}</b>
+            </span>
+          )}
         </div>
         <button
           className="btn danger small"
@@ -228,6 +233,7 @@ function describe(type: string, d: Record<string, unknown>): string {
     case 'outcome.failed': return `Outcome failed — ${item} was cancelled`;
     case 'payment.refunded': return `Refunded${amount} for ${item}${d.mode === 'mock' ? ' (simulated)' : ''}`;
     case 'payment.refund_failed': return `Refund failed for ${item}`;
+    case 'agent.run': return `${d.agent} planned with ${d.model}: “${String(d.instruction).slice(0, 70)}”`;
     case 'audit.reconciled': return `Reconciled with PayPal — ${d.checked} checked, ${d.mismatches} mismatch${d.mismatches === 1 ? '' : 'es'}`;
     case 'paypal.webhook': return `PayPal webhook ${String(d.event_type ?? '').toLowerCase()} for ${item}`;
     case 'recovery.proposed': return `Recovery proposed — ${d.replacement} $${d.amount}`;

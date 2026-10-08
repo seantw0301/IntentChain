@@ -1,5 +1,6 @@
 import { db, list, newId } from './db';
 import { aiMode } from './jev';
+import { llmModel } from './llm';
 import { autopayAgreement, paypalMode } from './paypal';
 import { getPolicy } from './policy';
 import type {
@@ -104,6 +105,7 @@ export function snapshot(session: string): AppState {
     config: {
       paypal_mode: paypalMode(),
       ai_mode: aiMode(),
+      agent_model: llmModel(),
       demo_mode: process.env.DEMO_MODE !== 'false',
     },
   };

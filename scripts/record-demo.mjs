@@ -55,10 +55,10 @@ const SCENES = [
   },
   {
     id: 'intro',
-    say: 'A ten-person company has no travel desk and no procurement team. This is IntentChain: autonomous travel and procurement for small businesses, built on PayPal. Let AI spend. Keep your business in control.',
+    say: 'IntentChain: autonomous travel and procurement for small businesses, built on PayPal. Let AI spend. Keep your business in control.',
     do: async (p) => {
       await card(p, ['Ten people. No travel desk. No procurement team.', 'IntentChain', 'Let AI spend. Keep your business in control.']);
-      await sleep(10500);
+      await sleep(8000);
       await card(p, null);
     },
   },
@@ -89,13 +89,13 @@ const SCENES = [
   },
   {
     id: 'attack',
-    say: 'Now an attack. An agent requests a grant with the same five hundred dollars, plus one new capability. Same amount, but not a subset. Rejected. And a seven hundred and eighty dollar suite is stopped, with the responsible agent named.',
+    say: 'Now an attack. An agent requests a grant with the same five hundred dollars, plus one new capability. Same amount, but not a subset. Rejected.',
     do: async (p) => {
-      await sleep(1000);
+      await sleep(800);
       await guide(p);
       await view(p, '.note.block');
-      await sleep(6000);
-      await guide(p);
+      await sleep(5500);
+      await guide(p, 1800); // the over-limit suite: shown briefly, stopped on authority
       await view(p, '.checks');
     },
   },
@@ -109,13 +109,17 @@ const SCENES = [
   },
   {
     id: 'drift',
-    say: 'Here is what a policy cannot catch. The travel agent hands off a vague task: improve the overall travel experience. It is a valid subset, so no rule rejects it. But its intent fidelity drops. That agent books a sunset dinner cruise, as a business meal. Allowed category. In budget. Within authority. Every policy check passes. But it is not what the employee was sent to do. Blocked, and traced to the exact hand-off where the intent drifted.',
+    say: 'Here is what a policy cannot catch. The travel agent hands off a vague task: improve the overall travel experience. A valid subset, so no rule rejects it. But its intent fidelity drops. Now a real L L M acts as that agent. It knows the company policy, so it looks for something the policy allows, and books a sunset dinner cruise as a business meal. Allowed category. In budget. Within authority. Every policy check passes. But it is not what the employee was sent to do. Blocked, and traced to the exact hand-off where the intent drifted.',
     do: async (p) => {
-      await sleep(2000);
+      await sleep(1500);
       await guide(p);
       await view(p, '.branch');
-      await sleep(9000);
-      await guide(p);
+      await sleep(4500);
+      await guide(p, 1500); // the model plans and calls tools; this takes a while
+      if (await p.locator('.transcript').count()) {
+        await view(p, '.transcript');
+        await sleep(5000);
+      }
       await view(p, '.checks');
     },
   },
@@ -213,7 +217,8 @@ async function guide(p, settle = 2500) {
   const button = p.locator('.guide button');
   await button.waitFor({ state: 'visible', timeout: 15000 });
   await click(p, button);
-  await p.waitForFunction(() => !document.querySelector('.guide button')?.disabled, null, { timeout: 30000 }).catch(() => {});
+  // long enough for a step in which an LLM agent plans and calls tools
+  await p.waitForFunction(() => !document.querySelector('.guide button')?.disabled, null, { timeout: 120000 }).catch(() => {});
   await sleep(settle);
 }
 

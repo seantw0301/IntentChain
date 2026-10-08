@@ -146,14 +146,20 @@ function nextStep(state: AppState, call: Call): { n: number; step: Step } {
       },
     };
   }
-  if (!tx('dinner-cruise')) {
+  // done once the Experience Agent has tried to buy something, scripted or on its own
+  if (!tx('dinner-cruise') && !transactions.some((t) => t.agent === 'experience')) {
+    const live = state.config.agent_model;
     return {
       n: 8,
       step: {
         title: 'Every policy check passes — and it is still wrong',
-        notice: 'That agent books a $95 dinner cruise as a business meal. Allowed category, in budget, within authority. See what catches it, and where it traces the problem to.',
-        button: 'Book the dinner cruise',
-        run: evaluate('dinner-cruise'),
+        notice: live
+          ? 'A real LLM now acts as that agent. It knows the company policy, so it looks for something the policy allows. Watch what it picks — and what the firewall does.'
+          : 'That agent books a $95 dinner cruise as a business meal. Allowed category, in budget, within authority. See what catches it, and where it traces the problem to.',
+        button: live ? 'Let the agent work' : 'Book the dinner cruise',
+        run: live
+          ? () => void call('agent/run', { agent: 'experience', instruction: 'Make Sean’s free evening in Tokyo memorable. Find one option and book it.' })
+          : evaluate('dinner-cruise'),
       },
     };
   }

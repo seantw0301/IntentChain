@@ -38,14 +38,19 @@ export function ActivityPanel({
   const [amount, setAmount] = useState('60');
   const [category, setCategory] = useState('other');
   const [buyer, setBuyer] = useState('travel');
+  const [ask, setAsk] = useState('Sean needs a ride from the airport to his hotel. Find an option and buy it.');
+  const [asker, setAsker] = useState('travel');
+  const run = [...state.events].reverse().find((e) => e.type === 'agent.run');
+  const steps = (run?.data.steps as { kind: string; text: string; tone?: string }[] | undefined) ?? [];
+  const grants = state.delegations.filter((d) => d.paypal_tools.length && d.status === 'ACTIVE');
   const hasCustom = state.delegations.some((d) => d.agent === 'custom');
 
   const office = state.intent?.kind === 'procurement';
-  const steps = office ? OFFICE_STEPS : STEPS;
+  const storySteps = office ? OFFICE_STEPS : STEPS;
   const bought = new Set(state.transactions.map((t) => t.item.id));
   const delegated = new Set(state.delegations.map((d) => d.agent as string));
   const isDone = (s: Step) => (s.item ? bought.has(s.item) : delegated.has(s.delegate as string));
-  const next = steps.find((s) => !isDone(s))?.key;
+  const next = storySteps.find((s) => !isDone(s))?.key;
   // an approved transaction should be paid before the story moves on
   const unpaid = state.transactions.some((t) => t.status === 'APPROVED' || t.status === 'ORDER_CREATED');
   const hotel = state.transactions.find((t) => t.item.id === 'hotel-b' && t.status === 'CAPTURED');
@@ -58,7 +63,7 @@ export function ActivityPanel({
       ) : (
         <>
           <div className="steps">
-            {steps.map((s, i) => (
+            {storySteps.map((s, i) => (
               <button
                 key={s.key}
                 className={`stepbtn ${s.key === next && !unpaid ? 'next' : ''}`}
@@ -90,6 +95,48 @@ export function ActivityPanel({
             </button>}
           </div>
           {unpaid && <p className="hint" style={{ marginTop: 10 }}>A purchase is waiting for manager approval on the right.</p>}
+
+          {run && (
+            <div className="transcript">
+              <div className="transcript-head">
+                {String(run.data.agent)} · planning with <b>{String(run.data.model)}</b>
+              </div>
+              <p className="ask">“{String(run.data.instruction)}”</p>
+              <ol>
+                {steps.map((s, i) => (
+                  <li key={i} className={`${s.kind} ${s.tone ?? ''}`}>
+                    <span className="k">{s.kind === 'say' ? 'Agent' : s.kind === 'call' ? 'Tool call' : 'Firewall'}</span>
+                    <span className={s.kind === 'call' ? 'mono' : ''}>{s.text}</span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          )}
+
+          {state.config.agent_model && (
+            <details className="custom">
+              <summary>Ask an agent in your own words — a real LLM plans, the firewall decides</summary>
+              <div className="form">
+                <div className="wide">
+                  <label htmlFor="a-ask">Instruction</label>
+                  <input id="a-ask" type="text" value={ask} maxLength={300} onChange={(e) => setAsk(e.target.value)} />
+                </div>
+                <div className="wide">
+                  <label htmlFor="a-who">Agent</label>
+                  <select id="a-who" value={asker} onChange={(e) => setAsker(e.target.value)}>
+                    {grants.map((d) => (
+                      <option key={d.id} value={d.agent}>{d.label} — “{d.purpose}”</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="wide row end">
+                  <button className="btn small" disabled={busy !== null || ask.trim().length < 4} onClick={() => call('agent/run', { agent: asker, instruction: ask })}>
+                    {busy === 'agent/run' ? 'Agent is working…' : 'Run the agent'}
+                  </button>
+                </div>
+              </div>
+            </details>
+          )}
 
           <details className="custom">
             <summary>Try your own purchase</summary>

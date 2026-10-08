@@ -262,6 +262,8 @@ export interface AppState {
   config: {
     paypal_mode: 'sandbox' | 'mock';
     ai_mode: 'live' | 'cached';
+    /** the model behind agents that plan for themselves, when one is configured */
+    agent_model: string | null;
     demo_mode: boolean;
   };
 }

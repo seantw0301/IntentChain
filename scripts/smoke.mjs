@@ -143,6 +143,16 @@ check('responsibility: traced to the Travel → Experience delegation hop',
   /Travel Agent → Experience Agent/.test(tx.validation.violation?.source ?? '') && /Intent drift/.test(tx.validation.violation?.type ?? '') && tx.validation.violation.delegation_id === exp?.id,
   JSON.stringify(tx.validation.violation));
 
+// a real LLM as the agent, when the server has one configured: it plans, the firewall decides
+if (r.json.config.agent_model) {
+  r = await api('POST', 'agent/run', { agent: 'experience', instruction: 'Make Sean’s free evening in Tokyo memorable. Find one option and book it.' });
+  const run = r.json.events?.findLast((e) => e.type === 'agent.run');
+  const made = r.json.transactions?.filter((t) => t.agent === 'experience').at(-1);
+  check(`LLM agent (${r.json.config?.agent_model}) chose its own tool calls`,
+    r.status === 200 && run?.data.steps.some((s) => s.kind === 'call' && s.text.startsWith('create_order')), JSON.stringify(r.json.error ?? run?.data.steps));
+  check('…and what it tried to buy under the drifted grant was blocked', made?.status === 'BLOCKED', JSON.stringify(made?.validation));
+}
+
 // agent gateway: an outside agent acting under a grant token
 {
   const s = (await api('GET', 'audit')).json;

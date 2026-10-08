@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import { propose } from './agents';
-import { CATEGORIES } from './catalog';
+import { CATEGORIES, ITEMS } from './catalog';
 import { get, newId, sessionOfDelegation } from './db';
 import { verifyChain } from './delegation';
 import { capturePayment, createPayment } from './payments';
@@ -65,6 +65,7 @@ const DEFINITIONS: Record<string, ToolDefinition> = {
         amount_usd: { type: 'number', description: 'Total price in US dollars.' },
         category: { type: 'string', enum: CATEGORIES, description: 'The kind of purchase.' },
         nights: { type: 'integer', description: 'Number of nights, for lodging only.' },
+        option_id: { type: 'string', description: 'The option_id of a catalogue option, when buying one found by search_options.' },
       },
       required: ['item_name', 'amount_usd', 'category'],
       additionalProperties: false,
@@ -152,11 +153,14 @@ export async function callTool(grant: Grant, name: string, input: Record<string,
     const item_name = String(input.item_name ?? '').trim().slice(0, 80);
     const amount = Number(input.amount_usd);
     const category = String(input.category ?? 'other') as Category;
-    if (!item_name) throw new ApiError(400, 'INVALID_INPUT', 'item_name is required.');
-    if (!Number.isFinite(amount) || amount <= 0 || amount > 100000) throw new ApiError(400, 'INVALID_INPUT', 'amount_usd must be between 0 and 100,000.');
-    if (!CATEGORIES.includes(category)) throw new ApiError(400, 'INVALID_INPUT', `category must be one of: ${CATEGORIES.join(', ')}.`);
+    const picked = typeof input.option_id === 'string' && Boolean(ITEMS[input.option_id]);
+    if (!picked && !item_name) throw new ApiError(400, 'INVALID_INPUT', 'item_name is required.');
+    if (!picked && (!Number.isFinite(amount) || amount <= 0 || amount > 100000)) throw new ApiError(400, 'INVALID_INPUT', 'amount_usd must be between 0 and 100,000.');
+    if (!picked && !CATEGORIES.includes(category)) throw new ApiError(400, 'INVALID_INPUT', `category must be one of: ${CATEGORIES.join(', ')}.`);
     const nights = Number.isInteger(input.nights) && (input.nights as number) > 0 ? (input.nights as number) : undefined;
-    const item: CatalogItem = {
+    // a catalogue option keeps its identity; anything else is taken as described
+    const known = typeof input.option_id === 'string' ? ITEMS[input.option_id] : undefined;
+    const item: CatalogItem = known ?? {
       id: newId('ext'),
       name: item_name,
       merchant: 'External agent',

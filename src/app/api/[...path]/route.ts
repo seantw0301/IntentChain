@@ -11,6 +11,7 @@ import {
   delegateExperience,
 } from '@/lib/delegation';
 import { activeIntent, confirmIntent, createIntent } from '@/lib/intent';
+import { runAgent } from '@/lib/llm-agent';
 import { authenticate, callTool, toolsForGrant } from '@/lib/gateway';
 import { applyWebhook, capturePayment, createPayment, reconcile, reportOutcome } from '@/lib/payments';
 import { verifyWebhook } from '@/lib/paypal';
@@ -80,6 +81,15 @@ const ROUTES: [string, string, Handler][] = [
   ['POST', 'transaction/evaluate', async ({ session, body }) => {
     const tx = body.step ? await runStep(session, String(body.step)) : await proposeCustom(session, body);
     return { ...snapshot(session), focus: tx.id };
+  }],
+  // an agent that plans for itself: the model picks the tool calls, the firewall decides what happens
+  ['POST', 'agent/run', async ({ session, body }) => {
+    const role = String(body.agent ?? 'travel');
+    if (!['travel', 'booking', 'experience', 'custom'].includes(role)) throw new ApiError(400, 'UNKNOWN_AGENT', 'Unknown agent.');
+    const before = new Set(snapshot(session).transactions.map((t) => t.id));
+    await runAgent(session, role as never, body.instruction, await publicOrigin());
+    const after = snapshot(session);
+    return { ...after, focus: after.transactions.findLast((t) => !before.has(t.id))?.id };
   }],
   ['POST', 'transaction/:id/confirm', ({ session, params, body }) => {
     const tx = resolveWarning(session, params[0], body.approve === true);

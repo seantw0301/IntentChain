@@ -158,8 +158,17 @@ state object:
 - **Intent fidelity per hop** — rates how faithfully each grant's stated task stays within the human intent. Below 65 is flagged as drift.
 - **Independent review** — the AI separately picks the best hotel and rates the recovery proposal, and the result is recorded next to the rule-based decision.
 
-The agents themselves are deterministic orchestrators: code runs the workflow, the AI supplies
-judgement, and the validator has the last word.
+**Agents that plan for themselves.** When the server is given a tool-calling LLM
+(`LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL` — any OpenAI-compatible endpoint; the hosted demo uses
+Claude), an agent can be handed its delegated task and an instruction and left to work: it reads
+the company policy, searches the catalogue, picks an option and calls the PayPal tools. It has no
+PayPal access of its own — every call goes through the same gateway and firewall an outside agent
+would use. In the demo story this is the drift step: the model, knowing entertainment is blocked,
+looks for something the policy allows, books the dinner cruise as a business meal, is blocked, and
+reports why. *Ask an agent in your own words* lets you give any agent any instruction.
+
+Without an LLM configured, the agents follow fixed workflows: code runs the steps, the intent AI
+supplies judgement, and the firewall has the last word.
 
 ## Run it yourself
 
@@ -183,6 +192,7 @@ what you put in it:
 | `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET` | Real PayPal **sandbox** orders, captures and refunds |
 | `PAYPAL_AUTOPAY_AGREEMENT_ID` | Real **auto-pay**: the id of a sandbox billing agreement a buyer approved for your app. Without it, small purchases fall back to checkout |
 | `JEV_API_KEY` | **Live** AI intent analysis |
+| `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL` | Agents that **plan for themselves** with a tool-calling LLM (OpenAI-compatible endpoint) |
 
 To connect auto-pay to your own sandbox app, run `node scripts/connect-autopay.mjs`: it creates
 the billing agreement request, waits while you approve it as a sandbox buyer, and prints the line
@@ -219,6 +229,7 @@ All paths are under `/intentchain/api`. Every `POST` returns the full, fresh sta
 | `POST` | `/intent/{id}/confirm` | — |
 | `POST` | `/delegate` | `{ parent, agent, budget, scope, expires_at }` — rejected with `422` if not a subset of the parent. `{ simulate: "escalation" \| "forgery" \| "experience" }` runs the scripted delegation events |
 | `POST` | `/transaction/evaluate` | `{ step }` or `{ name, amount, category }` |
+| `POST` | `/agent/run` | `{ agent, instruction }` — an LLM agent plans and calls tools; the firewall decides |
 | `POST` | `/transaction/{id}/confirm` | `{ approve }` — resolves a human-review warning |
 | `POST` | `/paypal/order` | `{ transaction_id }` — only for approved transactions |
 | `POST` | `/paypal/capture` | `{ transaction_id }` |
@@ -244,6 +255,7 @@ src/lib/
   paypal.ts         PayPal Agent Toolkit access, per-role permissions
   payments.ts       order, capture, refund, outcome, recovery, reconciliation, webhooks
   gateway.ts        agent gateway: grant tokens and guarded PayPal tools
+  llm-agent.ts      agents that plan for themselves with a tool-calling LLM
   jev.ts            AI client
   audit.ts          event log and dashboard metrics
   db.ts             SQLite storage, keyed by browser session
@@ -268,7 +280,7 @@ More detail: [docs/architecture.md](docs/architecture.md).
 ## Limits of the demo
 
 - Hotels and products are fixed demo data; there is no live product search.
-- Two scenarios (a business trip and a short office purchase) are scripted, and the agents follow fixed workflows; the AI supplies judgement, not planning. Custom purchases, your own delegated tasks and the agent gateway let you go off-script.
+- Two scenarios (a business trip and a short office purchase) are scripted. Most steps follow fixed workflows; the drift step and *Ask an agent* are planned by an LLM when one is configured. Custom purchases, your own delegated tasks and the agent gateway let you go off-script.
 - The hosted demo shares one sandbox billing agreement for auto-pay, so every visitor's auto-paid purchases come from the same sandbox buyer.
 - Recovery stops at a proposal awaiting human approval; it does not pay for the replacement.
 - Grants are signed with a server-held HMAC key. Agents here run inside one process; in a real deployment each agent would hold its own key.
