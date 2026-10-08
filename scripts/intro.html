@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>IntentChain Business Agent — opening</title>
+<style>
+  /* The first 30 seconds of the demo video: an everyday story told with objects
+     on a desk — a phone, sticky notes, company cards, stamps — not diagrams.
+     scripts/record-intro.mjs plays and records it. Time is driven by classes
+     b1…b12 added to <body> (see the script at the bottom). */
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; }
+  body {
+    font-family: -apple-system, 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif;
+    color: #2b2620;
+    /* a desk in daylight */
+    background:
+      radial-gradient(1200px 700px at 78% 8%, rgba(255, 244, 214, 0.9), transparent 60%),
+      linear-gradient(160deg, #e9dfcf 0%, #dccdb6 55%, #cdbb9f 100%);
+  }
+  .grain { position: fixed; inset: 0; opacity: 0.22; mix-blend-mode: multiply; pointer-events: none;
+    background-image: repeating-linear-gradient(92deg, rgba(120, 90, 50, 0.10) 0 2px, transparent 2px 9px),
+                      repeating-linear-gradient(88deg, rgba(90, 60, 30, 0.06) 0 1px, transparent 1px 23px); }
+  /* things that live on a desk */
+  .cup { position: fixed; right: -70px; bottom: -80px; width: 250px; height: 250px; border-radius: 50%;
+         background: radial-gradient(circle at 46% 44%, #5a3a22 0 34%, #3d2515 35% 41%, #f3ede2 42% 52%, #e2d8c8 53% 60%, transparent 61%);
+         box-shadow: 14px 18px 26px rgba(60, 40, 20, 0.28); }
+  .notebook { position: fixed; left: -60px; bottom: -150px; width: 360px; height: 260px; transform: rotate(8deg); border-radius: 6px;
+              background: repeating-linear-gradient(#fbf8f1 0 25px, #cfd8e6 25px 26px); box-shadow: 0 14px 24px rgba(60, 40, 20, 0.25);
+              border-left: 16px solid #2c3550; }
+  .hand { font-family: 'Bradley Hand', 'Marker Felt', 'Comic Sans MS', cursive; }
+  .scene { position: fixed; inset: 0; opacity: 0; transition: opacity 0.6s ease; }
+
+  /* ---------- the phone ---------- */
+  .phone {
+    position: absolute; left: 150px; top: 60px; width: 318px; height: 604px; border-radius: 46px;
+    background: #111; padding: 12px; transform: rotate(-4deg);
+    box-shadow: 0 38px 60px rgba(60, 40, 20, 0.35), 0 6px 12px rgba(60, 40, 20, 0.25);
+  }
+  .screen { position: relative; width: 100%; height: 100%; border-radius: 35px; overflow: hidden; background: #f4f4f6; }
+  .island { position: absolute; top: 10px; left: 50%; width: 92px; height: 26px; margin-left: -46px; border-radius: 14px; background: #111; z-index: 5; }
+  .status { position: absolute; top: 12px; left: 26px; font-size: 13px; font-weight: 600; z-index: 5; }
+
+  /* chat */
+  .chat { position: absolute; inset: 0; padding: 58px 14px 14px; background: #fff; transition: opacity 0.5s; }
+  .chat header { text-align: center; font-size: 12px; color: #8a8a8e; padding-bottom: 10px; border-bottom: 1px solid #ececef; }
+  .chat header b { display: block; font-size: 15px; color: #111; }
+  .day { text-align: center; font-size: 11px; color: #9a9aa0; margin: 12px 0 8px; }
+  .msg { max-width: 82%; padding: 9px 12px; border-radius: 18px; font-size: 14.5px; line-height: 1.32; margin-bottom: 8px;
+         opacity: 0; transform: translateY(10px) scale(0.96); transition: all 0.35s cubic-bezier(.2,.9,.3,1.2); }
+  .msg.in { background: #e9e9eb; color: #111; border-bottom-left-radius: 5px; }
+  .msg.out { background: #2f7cf6; color: #fff; margin-left: auto; border-bottom-right-radius: 5px; }
+
+  /* lock screen */
+  .lock { position: absolute; inset: 0; opacity: 0; transition: opacity 0.6s;
+          background: linear-gradient(170deg, #27344f 0%, #1b2233 60%, #131722 100%); color: #fff; text-align: center; }
+  .lock .date { margin-top: 70px; font-size: 15px; opacity: 0.85; }
+  .lock .time { font-size: 74px; font-weight: 300; letter-spacing: -2px; line-height: 1; margin-top: 2px; }
+  .note { position: absolute; left: 10px; right: 10px; top: 210px; text-align: left; padding: 11px 12px; border-radius: 18px;
+          background: rgba(245, 245, 247, 0.92); color: #111; backdrop-filter: blur(8px);
+          opacity: 0; transform: translateY(-26px); transition: all 0.45s cubic-bezier(.2,.9,.3,1.15); }
+  .note .app { display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: #55555a; text-transform: uppercase; letter-spacing: 0.4px; }
+  .note .app i { width: 18px; height: 18px; border-radius: 5px; background: #1f4fd6; display: inline-block; }
+  .note .app span { margin-left: auto; text-transform: none; }
+  .note b { display: block; font-size: 15px; margin-top: 5px; }
+  .note p { margin: 2px 0 0; font-size: 13.5px; line-height: 1.3; color: #333; }
+  .note.good .app i { background: #16a56a; }
+  .note.second { top: 318px; }
+
+  /* sticky notes and captions on the desk */
+  .sticky { position: absolute; padding: 13px 16px; font-size: 21px; line-height: 1.15; box-shadow: 0 8px 14px rgba(60, 40, 20, 0.22);
+            opacity: 0; transform: scale(0.7) rotate(var(--r, 0deg)); transition: all 0.35s cubic-bezier(.2,.9,.3,1.3); }
+  .sticky.y { background: #ffe873; } .sticky.g { background: #c9f2b4; } .sticky.p { background: #ffc9d6; }
+  .caption { position: absolute; left: 560px; right: 70px; opacity: 0; transform: translateY(14px); transition: all 0.6s ease; }
+  .caption h1 { margin: 0; font-size: 56px; line-height: 1.08; letter-spacing: -1.4px; font-weight: 800; color: #221d17; }
+  .caption h1 em { font-style: normal; color: #b3261e; }
+  .caption p { margin: 14px 0 0; font-size: 24px; color: #5a4f40; }
+
+  /* ---------- scene 1: the problem ---------- */
+  body.b1 #s1 { opacity: 1; }
+  body.b1 #m1, body.b2 #m2 { opacity: 1; transform: none; }
+  body.b3 #s1 .chat { opacity: 0; }
+  body.b3 #s1 .lock { opacity: 1; }
+  body.b3 #n1 { opacity: 1; transform: none; }
+  body.b3 #s1 .phone { animation: buzz 0.5s 0.45s; }
+  @keyframes buzz { 0%,100% { transform: rotate(-4deg); } 20% { transform: rotate(-4deg) translateX(-5px); } 40% { transform: rotate(-4deg) translateX(5px); } 60% { transform: rotate(-4deg) translateX(-3px); } 80% { transform: rotate(-4deg) translateX(3px); } }
+  body.b4 #k1, body.b4 #k2, body.b4 #k3 { opacity: 1; transform: rotate(var(--r, 0deg)); }
+  #k2 { transition-delay: 0.25s; } #k3 { transition-delay: 0.5s; }
+  body.b5 #c1 { opacity: 1; transform: none; }
+  body.b6 #s1 { opacity: 0; }
+
+  /* ---------- scene 2: the answer ---------- */
+  body.b6 #s2 { opacity: 1; }
+  body.b6 #n2 { opacity: 1; transform: none; }
+  body.b7 #c2 { opacity: 1; transform: none; }
+  body.b8 #c2 .how { opacity: 1; transform: none; }
+  #c2 h2 { margin: 0 0 6px; font-size: 26px; letter-spacing: 0.2px; color: #6b5d48; font-weight: 700; }
+  #c2 h1 { font-size: 62px; }
+  #c2 h1 span { color: #0f7a4d; }
+  #c2 .how { margin-top: 26px; font-size: 27px; color: #3d352b; opacity: 0; transform: translateY(10px); transition: all 0.5s; }
+  #c2 .how s { color: #a3927a; } #c2 .how b { color: #0f7a4d; }
+  #c2 .on { margin-top: 12px; font-size: 18px; color: #7a6c57; }
+  body.b9 #s2 { opacity: 0; }
+
+  /* ---------- scene 3: how it works, as things on the desk ---------- */
+  body.b9 #s3 { opacity: 1; }
+  #s3 .label { position: absolute; top: 34px; font-size: 15px; font-weight: 700; letter-spacing: 1.6px; text-transform: uppercase; color: #7a6c57; }
+  .piece { opacity: 0; transform: translateY(16px); transition: all 0.5s ease; }
+  /* company cards that shrink at each hand-off */
+  .card { position: absolute; border-radius: 14px; color: #fff; padding: 14px 16px; box-shadow: 0 12px 20px rgba(40, 30, 15, 0.3);
+          background: linear-gradient(135deg, #2a3350, #151a2c); transform-origin: left bottom; }
+  .card .who { font-size: 15px; opacity: 0.85; }
+  .card .amt { font-weight: 800; letter-spacing: -0.5px; }
+  .card .tools { font-size: 12.5px; opacity: 0.8; margin-top: 4px; }
+  .card .sig { position: absolute; right: 12px; bottom: 8px; font-size: 22px; color: #ffd76a; transform: rotate(-8deg); }
+  .card .chip { width: 30px; height: 22px; border-radius: 5px; background: linear-gradient(135deg, #e7c66a, #b9973d); margin-bottom: 8px; }
+  .arrow { position: absolute; font-size: 34px; color: #8a775c; }
+  .fidelity { position: absolute; font-size: 20px; color: #5a4f40; }
+  .fidelity b { color: #0f7a4d; }
+  /* inspection stamps */
+  .stamp { position: absolute; width: 104px; height: 104px; border-radius: 50%; border: 4px double #1d6b4a; color: #1d6b4a;
+           display: grid; place-content: center; text-align: center; font-weight: 800; font-size: 14px; letter-spacing: 0.8px;
+           transform: rotate(var(--r, -8deg)) scale(1.6); opacity: 0; transition: all 0.28s cubic-bezier(.3,1.4,.5,1); }
+  .stamp small { display: block; font-size: 22px; line-height: 1; }
+  .stamp.star { border-color: #b3261e; color: #b3261e; width: 122px; height: 122px; font-size: 16px; }
+  /* three ways out */
+  .out { position: absolute; left: 988px; width: 262px; padding: 12px 16px; background: #fffdf7; font-size: 18px; line-height: 1.25;
+         box-shadow: 0 8px 14px rgba(60, 40, 20, 0.2); }
+  .out b { display: block; font-size: 21px; }
+  .out.receipt { border-top: 3px dashed #c9bfae; }
+  .out.approve { border-radius: 16px; background: #f4f4f6; }
+  .out.block { background: transparent; box-shadow: none; border: 5px solid #b3261e; color: #b3261e; transform: rotate(-5deg); font-weight: 800; }
+  .after { position: absolute; left: 70px; right: 70px; bottom: 30px; text-align: center; font-size: 22px; color: #5a4f40; }
+
+  body.b9 .p1 { opacity: 1; transform: rotate(var(--r, 0deg)); }
+  body.b10 .p2 { opacity: 1; transform: none; }
+  body.b10 .card.c2 { transition-delay: 0.3s; } body.b10 .card.c3 { transition-delay: 0.6s; }
+  body.b11 .stamp { opacity: 0.92; transform: rotate(var(--r, -8deg)) scale(1); }
+  .stamp.s2 { transition-delay: 0.14s; } .stamp.s3 { transition-delay: 0.28s; } .stamp.s4 { transition-delay: 0.42s; } .stamp.s5 { transition-delay: 0.62s; }
+  body.b12 .p4 { opacity: 1; transform: rotate(var(--r, 0deg)); }
+  body.b12 .out.approve { transition-delay: 0.2s; } body.b12 .out.block { transition-delay: 0.4s; } body.b12 .after { transition-delay: 0.7s; }
+</style>
+</head>
+<body>
+<div class="grain"></div>
+<div class="cup"></div>
+<div class="notebook"></div>
+
+<!-- ============ 0:00–0:10  the problem ============ -->
+<section class="scene" id="s1">
+  <div class="phone">
+    <div class="screen">
+      <div class="island"></div>
+      <div class="chat">
+        <header><b>Sean</b>Product team</header>
+        <div class="day">Monday 9:12</div>
+        <div class="msg in" id="m1">Client meeting in Tokyo next week. Can the AI assistant book my hotel and eSIM?</div>
+        <div class="msg out" id="m2">Go ahead. Budget is $600 👍</div>
+      </div>
+      <div class="lock">
+        <div class="date">Friday, October 16</div>
+        <div class="time">23:47</div>
+        <div class="note" id="n1">
+          <div class="app"><i></i>Company payments<span>now</span></div>
+          <b>Payment sent · $95.00</b>
+          <p>Tokyo Bay Sunset Dinner Cruise — booked by your AI assistant</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="sticky g hand" id="k1" style="left:545px; top:96px; --r:-5deg">Allowed category ✓</div>
+  <div class="sticky g hand" id="k2" style="left:800px; top:76px; --r:3deg">In budget ✓</div>
+  <div class="sticky g hand" id="k3" style="left:985px; top:108px; --r:-2deg">Within authority ✓</div>
+  <div class="caption" id="c1" style="top:300px">
+    <h1>No rule was broken.<br><em>Nobody asked for it.</em></h1>
+    <p>One agent handed the job to another. Somewhere along the way, the trip became a cruise.</p>
+  </div>
+</section>
+
+<!-- ============ 0:10–0:20  the answer ============ -->
+<section class="scene" id="s2">
+  <div class="phone">
+    <div class="screen">
+      <div class="island"></div>
+      <div class="lock" style="opacity:1">
+        <div class="date">Friday, October 16</div>
+        <div class="time">23:47</div>
+        <div class="note good" id="n2">
+          <div class="app"><i></i>IntentChain Business Agent<span>now</span></div>
+          <b>Blocked · $95.00 dinner cruise</b>
+          <p>Not what Sean was sent to do. Traced to the hand-off: Travel Agent → Experience Agent. Nothing was paid.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="caption" id="c2" style="top:150px">
+    <h2>IntentChain Business Agent</h2>
+    <h1>Let AI spend.<br><span>Keep your business in control.</span></h1>
+    <div class="how"><s>Checks the payment.</s> &nbsp;<b>Checks every hand-off</b> between agents.</div>
+    <div class="on">Before a dollar reaches PayPal.</div>
+  </div>
+</section>
+
+<!-- ============ 0:20–0:30  how it works ============ -->
+<section class="scene" id="s3">
+  <!-- beat 1: the owner's rules and the employee's request -->
+  <div class="label piece p1" style="left:70px">The owner's rules</div>
+  <div class="sticky y hand piece p1" style="left:66px; top:70px; width:232px; --r:-3deg">
+    Hotels ✓ eSIM ✓ meals ✓<br>Entertainment ✕<br>Auto-pay up to $150
+  </div>
+  <div class="sticky p hand piece p1" style="left:86px; top:262px; width:210px; --r:4deg">
+    Tokyo, client meeting.<br>$600 — Sean
+  </div>
+
+  <!-- beat 2: authority shrinks and is signed at every hand-off -->
+  <div class="label piece p2" style="left:360px">Every hand-off: smaller, and signed</div>
+  <div class="card c1 piece p2" style="left:360px; top:86px; width:230px; height:142px">
+    <div class="chip"></div><div class="who">Travel Agent</div><div class="amt" style="font-size:34px">$600</div><div class="tools">3 PayPal tools</div><div class="sig hand">signed ✓</div>
+  </div>
+  <div class="arrow piece p2" style="left:604px; top:136px">→</div>
+  <div class="card c2 piece p2" style="left:644px; top:108px; width:196px; height:120px">
+    <div class="chip"></div><div class="who">Hotel Agent</div><div class="amt" style="font-size:28px">$500</div><div class="tools">no PayPal tools</div><div class="sig hand">signed ✓</div>
+  </div>
+  <div class="arrow piece p2" style="left:852px; top:146px">→</div>
+  <div class="card c3 piece p2" style="left:892px; top:128px; width:168px; height:100px">
+    <div class="who">Booking Agent</div><div class="amt" style="font-size:23px">$180 / night</div><div class="tools">3 PayPal tools</div><div class="sig hand" style="font-size:17px">signed ✓</div>
+  </div>
+  <div class="fidelity hand piece p2" style="left:362px; top:244px">still the same job?&nbsp; <b>92%</b> → <b>83%</b> → <b>79%</b></div>
+
+  <!-- beat 3: five inspection stamps before PayPal -->
+  <div class="label piece p2" style="left:360px; top:316px">Five checks before PayPal</div>
+  <div class="stamp s1" style="left:356px; top:352px; --r:-9deg"><small>✓</small>POLICY</div>
+  <div class="stamp s2" style="left:474px; top:362px; --r:5deg"><small>✓</small>BUDGET</div>
+  <div class="stamp s3" style="left:592px; top:350px; --r:-4deg"><small>✓</small>AUTHORITY</div>
+  <div class="stamp s4" style="left:712px; top:364px; --r:8deg"><small>✓</small>SCOPE</div>
+  <div class="stamp s5 star" style="left:832px; top:344px; --r:-6deg"><small>★</small>INTENT</div>
+
+  <!-- beat 4: three ways out -->
+  <div class="out receipt piece p4" style="top:292px; --r:2deg"><b>Auto-paid</b>eSIM $18 · PayPal, nobody in the loop</div>
+  <div class="out approve piece p4" style="top:392px; --r:-1deg"><b>Manager approves</b>Hotel $486 · in PayPal</div>
+  <div class="out block piece p4" style="top:486px; --r:-4deg"><b>BLOCKED</b>and traced to the hand-off responsible</div>
+  <div class="after hand piece p4">…and after payment: did it actually happen? If not — refund, and check the books against PayPal.</div>
+</section>
+
+<script>
+  // Beat times in seconds from the start. ?t=<seconds> jumps straight to a moment (for previews).
+  const BEATS = [0.2, 2.6, 4.4, 6.2, 7.9, 10.0, 11.2, 14.6, 20.0, 22.3, 24.8, 26.8];
+  const jump = Number(new URLSearchParams(location.search).get('t'));
+  BEATS.forEach((at, i) => {
+    const on = () => document.body.classList.add(`b${i + 1}`);
+    if (jump) { if (at <= jump) on(); } else setTimeout(on, at * 1000);
+  });
+</script>
+</body>
+</html>
