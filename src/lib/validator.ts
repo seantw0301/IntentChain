@@ -114,6 +114,8 @@ async function checkIntent(session: string, intent: Intent, item: CatalogItem, d
     session,
     {
       human_intent: {
+        // the requester's own words carry what was actually asked for
+        request: intent.prompt,
         goal: intent.goal,
         purpose: intent.purpose_detail,
         kind: intent.kind === 'procurement' ? 'office purchase' : `${intent.purpose} trip`,
