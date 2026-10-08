@@ -45,7 +45,7 @@ function speak(id, text) {
 const SCENES = [
   {
     id: 'intro',
-    say: 'Your AI agent just delegated your task to another agent. And that agent delegated it again. So who makes sure it is still what you asked for? This is IntentChain: an intent integrity firewall for multi-agent commerce, built on PayPal.',
+    say: 'Your AI agent just delegated your task to another agent. And that agent delegated it again. So who makes sure it is still what you asked for? This is IntentChain: an intent integrity firewall for developers who let AI agents pay with PayPal.',
     do: async (p) => {
       await card(p, ['Your agent delegated your task to another agent.', 'That agent delegated it again.', 'Who makes sure it is still what you asked for?']);
       await sleep(9500);
