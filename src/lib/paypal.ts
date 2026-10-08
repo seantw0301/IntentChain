@@ -118,19 +118,22 @@ export async function createOrder(input: OrderInput): Promise<Payment> {
   return { mode: 'sandbox', order_id: order.id, approve_url: approve.href };
 }
 
-export async function captureOrder(role: AgentRole, orderId: string): Promise<{ capture_id: string }> {
+export async function captureOrder(
+  role: AgentRole,
+  orderId: string,
+): Promise<{ capture_id: string; capture_status: string }> {
   if (paypalMode() === 'mock' || orderId.startsWith('SIM-')) {
     if (!toolsFor(role).includes('pay_order')) {
       throw new Error(`The ${role} agent has no permission to use the PayPal tool "pay_order".`);
     }
-    return { capture_id: sim('CAP') };
+    return { capture_id: sim('CAP'), capture_status: 'COMPLETED' };
   }
   const out = await call(role, 'pay_order', { id: orderId });
   const data = out?.response ?? out;
   if (out?.status === 'error') throw new Error(`PayPal capture failed: ${JSON.stringify(data).slice(0, 300)}`);
   const capture = data?.purchase_units?.[0]?.payments?.captures?.[0];
   if (!capture?.id) throw new Error('PayPal did not return a capture id. Has the buyer approved the order?');
-  return { capture_id: capture.id };
+  return { capture_id: capture.id, capture_status: String(capture.status ?? 'COMPLETED') };
 }
 
 export async function orderStatus(role: AgentRole, orderId: string): Promise<string> {

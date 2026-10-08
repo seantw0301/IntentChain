@@ -92,8 +92,9 @@ export async function capturePayment(session: string, id: string): Promise<Trans
     if (status !== 'APPROVED' && status !== 'COMPLETED') {
       throw new ApiError(409, 'NOT_APPROVED_BY_BUYER', `The buyer has not approved the PayPal order yet (${status}).`);
     }
-    const { capture_id } = await captureOrder(tx.agent, tx.payment.order_id);
+    const { capture_id, capture_status } = await captureOrder(tx.agent, tx.payment.order_id);
     tx.payment.capture_id = capture_id;
+    tx.payment.capture_status = capture_status;
     tx.status = 'CAPTURED';
     save(session, tx);
     if (tx.delegation_id) {

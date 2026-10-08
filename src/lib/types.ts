@@ -137,6 +137,8 @@ export interface Payment {
   order_id?: string;
   approve_url?: string | null;
   capture_id?: string;
+  /** PayPal's own status for the capture, e.g. COMPLETED or PENDING */
+  capture_status?: string;
   refund_id?: string;
   error?: string;
 }

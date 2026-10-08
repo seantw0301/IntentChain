@@ -181,7 +181,12 @@ export function ValidationCard({
       {tx.payment?.order_id && (
         <div className="meta">
           <span>PayPal order <code>{tx.payment.order_id}</code></span>
-          {tx.payment.capture_id && <span>Capture <code>{tx.payment.capture_id}</code></span>}
+          {tx.payment.capture_id && (
+            <span>
+              Capture <code>{tx.payment.capture_id}</code>
+              {tx.payment.capture_status && tx.payment.capture_status !== 'COMPLETED' && ` (PayPal status: ${tx.payment.capture_status.toLowerCase()})`}
+            </span>
+          )}
           {tx.payment.refund_id && <span>Refund <code>{tx.payment.refund_id}</code></span>}
           <span>{simulated ? 'Simulated — no PayPal call was made' : 'PayPal sandbox via Agent Toolkit'}</span>
         </div>
