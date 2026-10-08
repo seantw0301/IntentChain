@@ -1,0 +1,11 @@
+node_modules/
+.next/
+data/
+.env
+.env.local
+*.log
+.DS_Store
+tsconfig.tsbuildinfo
+next-env.d.ts
+# internal planning notes (not part of the submission)
+docs/internal/

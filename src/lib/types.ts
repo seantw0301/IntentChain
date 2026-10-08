@@ -1,0 +1,218 @@
+export type Category =
+  | 'lodging'
+  | 'connectivity'
+  | 'transport'
+  | 'entertainment'
+  | 'subscription'
+  | 'other';
+
+export type AgentRole = 'travel' | 'hotel' | 'booking' | 'recovery';
+
+export type AiSource = 'jev' | 'cached';
+
+export interface Restriction {
+  label: string;
+  category: Category;
+}
+
+export interface Intent {
+  id: string;
+  status: 'DRAFT' | 'ACTIVE';
+  prompt: string;
+  goal: string;
+  purpose: 'business' | 'leisure';
+  purpose_detail: string;
+  location: string;
+  budget: number;
+  currency: 'USD';
+  category_caps: Partial<Record<Category, number>>;
+  restrictions: Restriction[];
+  trip_start: string;
+  trip_end: string;
+  nights: number;
+  source: AiSource;
+  created_at: string;
+}
+
+export interface DelegationScope {
+  location: string;
+  from: string;
+  to: string;
+  categories?: Category[];
+}
+
+export interface Delegation {
+  id: string;
+  intent_id: string;
+  parent: string; // 'human' or a parent delegation id
+  from: 'human' | AgentRole;
+  agent: AgentRole;
+  purpose: string;
+  budget: number;
+  category_caps?: Partial<Record<Category, number>>;
+  per_night?: number;
+  scope: DelegationScope;
+  expires_at: string;
+  single_use: boolean;
+  status: 'ACTIVE' | 'USED' | 'EXPIRED' | 'REVOKED';
+  paypal_tools: string[];
+  created_at: string;
+}
+
+export interface CatalogItem {
+  id: string;
+  name: string;
+  merchant: string;
+  description: string;
+  amount: number;
+  category: Category;
+  location: string;
+  /** days after trip start on which the purchase is used */
+  day_offset: number;
+  nights?: number;
+  /** reference alignment score for a business trip (used when the AI is offline) */
+  reference_score?: number;
+}
+
+export interface Check {
+  pass: boolean;
+  detail: string;
+}
+
+export interface IntentCheck {
+  status: 'pass' | 'warning' | 'fail' | 'skipped';
+  score: number | null;
+  detail: string;
+  restriction: string | null;
+  source: AiSource | null;
+}
+
+export interface Validation {
+  budget: Check;
+  authority: Check;
+  scope: Check;
+  intent: IntentCheck;
+  decision: 'APPROVED' | 'WARNING' | 'BLOCKED';
+  reason_code:
+    | 'OK'
+    | 'AUTHORITY_EXCEEDED'
+    | 'BUDGET_EXCEEDED'
+    | 'OUT_OF_SCOPE'
+    | 'INTENT_MISMATCH'
+    | 'NEEDS_HUMAN_REVIEW'
+    | 'REJECTED_BY_HUMAN';
+  headline: string;
+}
+
+export type TxStatus =
+  | 'BLOCKED'
+  | 'WARNING'
+  | 'APPROVED'
+  | 'ORDER_CREATED'
+  | 'CAPTURED'
+  | 'PAYMENT_FAILED'
+  | 'OUTCOME_FAILED'
+  | 'REFUNDED'
+  | 'REFUND_FAILED';
+
+export interface Payment {
+  mode: 'sandbox' | 'mock';
+  order_id?: string;
+  approve_url?: string | null;
+  capture_id?: string;
+  refund_id?: string;
+  error?: string;
+}
+
+export interface Transaction {
+  id: string;
+  intent_id: string;
+  agent: AgentRole;
+  delegation_id: string | null;
+  item: CatalogItem;
+  decision_id?: string;
+  validation: Validation;
+  status: TxStatus;
+  payment?: Payment;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DecisionOption {
+  item: CatalogItem;
+  minutes_to_meeting: number;
+  refundable: boolean;
+  outcome: 'SELECTED' | 'REJECTED';
+  reason: string;
+}
+
+export interface Decision {
+  id: string;
+  intent_id: string;
+  agent: AgentRole;
+  question: string;
+  options: DecisionOption[];
+  selected_item_id: string;
+  because: string[];
+  source: AiSource;
+  created_at: string;
+}
+
+export interface Recovery {
+  id: string;
+  intent_id: string;
+  failed_transaction_id: string;
+  status: 'REQUIRED' | 'AWAITING_HUMAN';
+  proposal?: {
+    item: CatalogItem;
+    validation: Validation;
+    reason: string;
+    source: AiSource;
+  };
+  created_at: string;
+}
+
+export interface AuditEvent {
+  seq: number;
+  id: string;
+  type: string;
+  intent_id: string | null;
+  transaction_id: string | null;
+  actor: string;
+  at: string;
+  data: Record<string, unknown>;
+}
+
+export interface Metrics {
+  budget: number;
+  spent: number;
+  remaining: number;
+  intent_integrity: number | null;
+  authority_integrity: number | null;
+  outcome_status: 'No payments yet' | 'On Track' | 'Recovery Active';
+}
+
+export interface AppState {
+  intent: Intent | null;
+  delegations: Delegation[];
+  transactions: Transaction[];
+  decisions: Decision[];
+  recoveries: Recovery[];
+  events: AuditEvent[];
+  metrics: Metrics | null;
+  config: {
+    paypal_mode: 'sandbox' | 'mock';
+    ai_mode: 'live' | 'cached';
+    demo_mode: boolean;
+  };
+}
+
+export class ApiError extends Error {
+  constructor(
+    public status: number,
+    public code: string,
+    message: string,
+  ) {
+    super(message);
+  }
+}
