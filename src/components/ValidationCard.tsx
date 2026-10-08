@@ -49,6 +49,8 @@ export function ValidationCard({
 
   // lineage: the transaction's grant and every ancestor, root first
   const byId = new Map(state.delegations.map((d) => [d.id, d]));
+  const nameOf = (role: string) => state.delegations.find((d) => d.agent === role)?.label ?? AGENT[role];
+  const proposer = (tx.delegation_id && byId.get(tx.delegation_id)?.label) || AGENT[tx.agent];
   const lineage = [];
   for (let d = tx.delegation_id ? byId.get(tx.delegation_id) : undefined; d; d = d.parent === 'human' ? undefined : byId.get(d.parent)) {
     lineage.unshift(d);
@@ -115,7 +117,7 @@ export function ValidationCard({
         <div className="what">
           <h3>{tx.item.name}</h3>
           <p>
-            Proposed by {AGENT[tx.agent]} · {tx.item.merchant} · {tx.item.category} · traces to <code>{tx.intent_id}</code>
+            Proposed by {proposer} · {tx.item.merchant} · {tx.item.category} · traces to <code>{tx.intent_id}</code>
           </p>
         </div>
         <div className="price">${tx.item.amount}</div>
@@ -186,7 +188,7 @@ export function ValidationCard({
           </li>
           {lineage.map((d) => (
             <li key={d.id} className={d.drift ? 'drifted' : ''}>
-              <b>{AGENT[d.from]} → {AGENT[d.agent]}</b> <code>{d.id}</code> — “{d.purpose}”, up to ${d.budget}
+              <b>{d.from === 'human' ? 'Requester' : nameOf(d.from)} → {d.label ?? AGENT[d.agent]}</b> <code>{d.id}</code> — “{d.purpose}”, up to ${d.budget}
               {d.fidelity && <> · fidelity {d.fidelity.score}%{d.drift ? ' ⚠ drift' : ''}</>}
             </li>
           ))}

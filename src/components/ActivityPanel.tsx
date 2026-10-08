@@ -16,6 +16,11 @@ const STEPS: Step[] = [
   { key: 'airport-transfer', item: 'airport-transfer', title: 'Airport transfer', who: 'Travel Agent', price: 110 },
 ];
 
+const OFFICE_STEPS: Step[] = [
+  { key: 'usb-adapter', item: 'usb-adapter', title: 'USB-C adapters (3-pack)', who: 'Purchasing Agent', price: 49 },
+  { key: 'gaming-gpu', item: 'gaming-gpu', title: 'Gaming graphics card', who: 'Purchasing Agent goes off-request', price: 799 },
+];
+
 const CATEGORIES = ['lodging', 'connectivity', 'transport', 'meals', 'office', 'entertainment', 'subscription', 'gaming', 'other'];
 
 export function ActivityPanel({
@@ -35,10 +40,12 @@ export function ActivityPanel({
   const [buyer, setBuyer] = useState('travel');
   const hasCustom = state.delegations.some((d) => d.agent === 'custom');
 
+  const office = state.intent?.kind === 'procurement';
+  const steps = office ? OFFICE_STEPS : STEPS;
   const bought = new Set(state.transactions.map((t) => t.item.id));
   const delegated = new Set(state.delegations.map((d) => d.agent as string));
   const isDone = (s: Step) => (s.item ? bought.has(s.item) : delegated.has(s.delegate as string));
-  const next = STEPS.find((s) => !isDone(s))?.key;
+  const next = steps.find((s) => !isDone(s))?.key;
   // an approved transaction should be paid before the story moves on
   const unpaid = state.transactions.some((t) => t.status === 'APPROVED' || t.status === 'ORDER_CREATED');
   const hotel = state.transactions.find((t) => t.item.id === 'hotel-b' && t.status === 'CAPTURED');
@@ -51,7 +58,7 @@ export function ActivityPanel({
       ) : (
         <>
           <div className="steps">
-            {STEPS.map((s, i) => (
+            {steps.map((s, i) => (
               <button
                 key={s.key}
                 className={`stepbtn ${s.key === next && !unpaid ? 'next' : ''}`}
@@ -68,7 +75,7 @@ export function ActivityPanel({
                 <span className="p">{s.price !== undefined ? `$${s.price}` : '↳'}</span>
               </button>
             ))}
-            <button
+            {!office && <button
               className={`stepbtn ${hotel ? 'next' : ''}`}
               disabled={busy !== null || !hotel}
               onClick={() => hotel && call('outcome/event', { transaction_id: hotel.id, type: 'booking_cancelled' })}
@@ -80,7 +87,7 @@ export function ActivityPanel({
                 <span className="s">Outcome event after payment</span>
               </span>
               <span className="p">!</span>
-            </button>
+            </button>}
           </div>
           {unpaid && <p className="hint" style={{ marginTop: 10 }}>A purchase is waiting for manager approval on the right.</p>}
 

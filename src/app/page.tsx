@@ -160,7 +160,7 @@ export default function Home() {
       )}
 
       {state.events.length > 0 && (
-        <div className="grid low">
+        <div className="grid">
           <AuditPanel state={state} focus={focused?.id ?? null} onFocus={setFocus} call={call} busy={busy} />
           <section className="panel">
             <h2>Audit timeline</h2>

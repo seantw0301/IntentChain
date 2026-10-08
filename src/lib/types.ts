@@ -15,6 +15,7 @@ export interface CompanyPolicy {
   company: string;
   travel_budget: number;
   hotel_limit: number;
+  procurement_budget: number;
   /** purchases at or below this are paid without asking a manager */
   auto_pay_limit: number;
   allowed_categories: Category[];
@@ -40,6 +41,8 @@ export interface Restriction {
 
 export interface Intent {
   id: string;
+  /** a business trip, or a purchase for the office */
+  kind: 'travel' | 'procurement';
   status: 'DRAFT' | 'ACTIVE';
   prompt: string;
   goal: string;
@@ -70,6 +73,8 @@ export interface Delegation {
   parent: string; // 'human' or a parent delegation id
   from: 'human' | AgentRole;
   agent: AgentRole;
+  /** display name: the same role is a Booking Agent on a trip and a Purchasing Agent in procurement */
+  label: string;
   purpose: string;
   budget: number;
   category_caps?: Partial<Record<Category, number>>;

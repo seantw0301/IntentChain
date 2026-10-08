@@ -1,7 +1,11 @@
 'use client';
 
-import type { AppState, Transaction } from '@/lib/types';
+import dynamic from 'next/dynamic';
+import type { AppState } from '@/lib/types';
 import type { Call } from '@/app/page';
+
+// AG Grid touches the DOM on import, so it is loaded in the browser only
+const LedgerGrid = dynamic(() => import('./LedgerGrid'), { ssr: false });
 
 interface Row {
   transaction_id: string;
@@ -10,38 +14,6 @@ interface Row {
   local: string;
   paypal: string;
   match: boolean | null;
-}
-
-function mark(t: Transaction): { cls: string; sym: string; text: string } {
-  const sim = t.payment?.mode === 'mock' ? ' (simulated)' : '';
-  switch (t.status) {
-    case 'CAPTURED':
-      return {
-        cls: 'ok',
-        sym: '✓',
-        text: t.payment?.via === 'billing_agreement' ? `Auto-paid via PayPal${sim}` : `Manager approved · PayPal captured${sim}`,
-      };
-    case 'APPROVED': return { cls: 'wait', sym: '•', text: 'Waiting for manager approval' };
-    case 'ORDER_CREATED': return { cls: 'wait', sym: '•', text: 'Waiting for manager approval in PayPal' };
-    case 'WARNING': return { cls: 'wait', sym: '!', text: 'Needs human review' };
-    case 'OUTCOME_FAILED': return { cls: 'no', sym: '✓', text: 'Captured · outcome failed' };
-    case 'REFUNDED': return { cls: 'wait', sym: '✓', text: `Captured · outcome failed · refunded${sim}` };
-    case 'BLOCKED': return { cls: 'no', sym: '✕', text: reason(t) };
-    default: return { cls: 'no', sym: '✕', text: t.status.replace(/_/g, ' ').toLowerCase() };
-  }
-}
-
-function reason(t: Transaction): string {
-  switch (t.validation.reason_code) {
-    case 'POLICY_VIOLATION': return 'Blocked — company policy';
-    case 'INTENT_DRIFT': return 'Blocked — intent drift, not what was asked for';
-    case 'AUTHORITY_EXCEEDED': return 'Blocked — delegated authority exceeded';
-    case 'BUDGET_EXCEEDED': return 'Budget exceeded';
-    case 'OUT_OF_SCOPE': return 'Out of scope';
-    case 'INTENT_MISMATCH': return 'Intent mismatch';
-    case 'REJECTED_BY_HUMAN': return 'Rejected by human';
-    default: return 'Blocked';
-  }
 }
 
 export function AuditPanel({
@@ -93,21 +65,7 @@ export function AuditPanel({
           {transactions.length === 0 ? (
             <p className="empty">No transactions yet.</p>
           ) : (
-            <div className="txs">
-              {transactions.map((t) => {
-                const k = mark(t);
-                return (
-                  <button key={t.id} className={`tx ${t.id === focus ? 'on' : ''}`} onClick={() => onFocus(t.id)}>
-                    <span className={`mark ${k.cls}`}>{k.sym}</span>
-                    <span className="title">
-                      {t.item.name}
-                      <span className="sub">{k.text}</span>
-                    </span>
-                    <span className="amt">${t.item.amount}</span>
-                  </button>
-                );
-              })}
-            </div>
+            <LedgerGrid state={state} focus={focus} onFocus={onFocus} />
           )}
 
           {reachedPayPal && (

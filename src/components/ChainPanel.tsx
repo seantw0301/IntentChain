@@ -39,7 +39,7 @@ function Node({ d, token }: { d: Delegation; token?: string }) {
   const [copied, setCopied] = useState(false);
   return (
     <div className={`node ${d.status !== 'ACTIVE' ? 'used' : ''} ${d.drift ? 'drifted' : ''}`}>
-      <h3>{AGENT_NAMES[d.agent]}</h3>
+      <h3>{d.label ?? AGENT_NAMES[d.agent]}</h3>
       <div className="amount">
         ${d.per_night ?? d.budget}
         {d.per_night !== undefined && <small> /night</small>}
@@ -110,7 +110,7 @@ export function ChainPanel({ state, call, busy }: { state: AppState; call: Call;
           {branches.map((d) => (
             <div className="branch" key={d.id}>
               <div className="branch-from">
-                {AGENT_NAMES[d.from]} also delegated →
+                {delegations.find((x) => x.agent === d.from)?.label ?? AGENT_NAMES[d.from]} also delegated →
                 {d.drift && <span className="drift-flag">⚠ INTENT DRIFT DETECTED</span>}
               </div>
               <Node d={d} token={state.grant_tokens?.[d.id]} />

@@ -6,6 +6,9 @@ import type { Call } from '@/app/page';
 export const EXAMPLE_PROMPT =
   'Sean from the product team is traveling to Tokyo for a client meeting next week. Arrange his hotel and eSIM under the company travel policy. Trip budget: $600.';
 
+export const OFFICE_PROMPT =
+  'Order USB-C adapters for the three new hires starting Monday. Budget: $200.';
+
 interface Step {
   title: string;
   notice: string;
@@ -31,6 +34,49 @@ function nextStep(state: AppState, call: Call): { n: number; step: Step } {
         notice: `${policy.company} lets agents pay up to $${policy.auto_pay_limit} on their own and blocks entertainment. Submit a request — your own, or the example.`,
         button: 'Use the example request',
         run: () => void call('intent', { prompt: EXAMPLE_PROMPT }),
+      },
+    };
+  }
+  if (intent.kind === 'procurement') {
+    // the short second story: the same policy and firewall, a different kind of request
+    if (intent.status === 'DRAFT') {
+      return {
+        n: 1,
+        step: {
+          title: 'Not just travel: an office purchase',
+          notice: 'Same company policy, same firewall. The roles are now Procurement, Sourcing and Purchasing.',
+          button: 'Confirm & delegate',
+          run: () => void call(`intent/${intent.id}/confirm`),
+        },
+      };
+    }
+    if (!tx('usb-adapter')) {
+      return {
+        n: 2,
+        step: {
+          title: 'Adapters for the new hires',
+          notice: `$49, an allowed category, and exactly what was asked for — auto-paid under the $${policy.auto_pay_limit} limit.`,
+          button: 'Order the adapters',
+          run: evaluate('usb-adapter'),
+        },
+      };
+    }
+    if (!tx('gaming-gpu')) {
+      return {
+        n: 3,
+        step: {
+          title: 'And something nobody asked for',
+          notice: 'The Purchasing Agent tries a $799 gaming graphics card.',
+          button: 'Try the graphics card',
+          run: evaluate('gaming-gpu'),
+        },
+      };
+    }
+    return {
+      n: 3,
+      step: {
+        title: 'Same rules, a different job.',
+        notice: 'Reset the demo to run the travel story again, or keep exploring.',
       },
     };
   }
@@ -151,19 +197,23 @@ function nextStep(state: AppState, call: Call): { n: number; step: Step } {
   return {
     n: TOTAL,
     step: {
-      title: 'That is the story. Now break it yourself.',
-      notice: 'Change the company policy, delegate a task in your own words, copy an agent token, or propose any purchase.',
+      title: 'That is the travel story. It is not just travel.',
+      notice: 'Run a short office purchase under the same policy — or change the policy, delegate your own task, and try to break it.',
+      button: 'Next: an office purchase',
+      // one request at a time: clear this one, then submit the office request
+      run: () => void call('demo/reset').then((ok) => ok && call('intent', { prompt: OFFICE_PROMPT })),
     },
   };
 }
 
 export function GuideBar({ state, call, busy }: { state: AppState; call: Call; busy: string | null }) {
   const { n, step } = nextStep(state, call);
+  const total = state.intent?.kind === 'procurement' ? 3 : TOTAL;
   return (
     <section className="guide" aria-label="Guided walkthrough">
       <div className="guide-progress" aria-hidden>
-        <span>Step {n} of {TOTAL}</span>
-        <span className="bar"><i style={{ width: `${(n / TOTAL) * 100}%` }} /></span>
+        <span>Step {n} of {total}</span>
+        <span className="bar"><i style={{ width: `${(n / total) * 100}%` }} /></span>
       </div>
       <div className="guide-text">
         <b>{step.title}</b>

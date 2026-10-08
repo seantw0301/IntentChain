@@ -86,6 +86,14 @@ Along the way the demo also shows a **delegation attack** (same amount, one extr
 rejected), a **forged grant**, **decision provenance** for the hotel (“Why this payment?”), the
 hotel **cancelling after payment** (refund and recovery), and **reconciliation** against PayPal.
 
+The story ends with a short **office purchase** under the same policy: USB-C adapters for new
+hires are auto-paid, a gaming graphics card is blocked. The roles are the same three, renamed —
+Procurement, Sourcing and Purchasing.
+
+Every proposed purchase lands in the **company ledger**, an [AG Grid](https://www.ag-grid.com)
+table with the firewall's verdict on each of the five checks, sortable and filterable per column,
+searchable, and exportable to CSV for the bookkeeper.
+
 Things to try yourself: unblock *Entertainment* in the policy and buy the theme park ticket again
 (policy now passes; intent still says no), change the auto-pay limit, delegate a task in your own
 words, or propose any purchase.
@@ -176,6 +184,10 @@ what you put in it:
 | `PAYPAL_AUTOPAY_AGREEMENT_ID` | Real **auto-pay**: the id of a sandbox billing agreement a buyer approved for your app. Without it, small purchases fall back to checkout |
 | `JEV_API_KEY` | **Live** AI intent analysis |
 
+To connect auto-pay to your own sandbox app, run `node scripts/connect-autopay.mjs`: it creates
+the billing agreement request, waits while you approve it as a sandbox buyer, and prints the line
+to add to `.env`.
+
 To get PayPal sandbox credentials, create a sandbox app at
 <https://developer.paypal.com/dashboard/applications/sandbox>. To approve payments as the buyer,
 use a sandbox *personal* account from
@@ -222,7 +234,7 @@ All paths are under `/intentchain/api`. Every `POST` returns the full, fresh sta
 
 ```
 src/app/            UI and the API route
-src/components/     UI panels
+src/components/     UI panels; LedgerGrid.tsx is the AG Grid company ledger
 src/lib/
   intent.ts         intent extraction and confirmation
   delegation.ts     monotonic rule, signed chain, intent fidelity per hop
@@ -245,7 +257,9 @@ More detail: [docs/architecture.md](docs/architecture.md).
 ## Tools used
 
 - **PayPal Agent Toolkit** and the PayPal sandbox — orders, captures, refunds, reconciliation
+- **PayPal billing agreements** — auto-pay without a buyer present
 - **PayPal Webhooks** — signature-verified payment events
+- **AG Grid** (Community) — the company ledger: per-column sort and filter, quick search, pinned totals row, CSV export
 - **Claude** (Anthropic SDK) — the example bring-your-own agent
 - **JEV (TypeSafe System One)** — intent extraction and alignment scoring
 - **Next.js / React / TypeScript** — UI and API in one app
@@ -254,7 +268,7 @@ More detail: [docs/architecture.md](docs/architecture.md).
 ## Limits of the demo
 
 - Hotels and products are fixed demo data; there is no live product search.
-- One scenario (a short business trip) is scripted, and the agents follow fixed workflows; the AI supplies judgement, not planning. Custom purchases, your own delegated tasks and the agent gateway let you go off-script.
+- Two scenarios (a business trip and a short office purchase) are scripted, and the agents follow fixed workflows; the AI supplies judgement, not planning. Custom purchases, your own delegated tasks and the agent gateway let you go off-script.
 - The hosted demo shares one sandbox billing agreement for auto-pay, so every visitor's auto-paid purchases come from the same sandbox buyer.
 - Recovery stops at a proposal awaiting human approval; it does not pay for the replacement.
 - Grants are signed with a server-held HMAC key. Agents here run inside one process; in a real deployment each agent would hold its own key.

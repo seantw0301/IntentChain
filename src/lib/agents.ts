@@ -20,6 +20,9 @@ export const SCENARIO: Record<string, { agent: AgentRole; item: string; label: s
   'dinner-cruise': { agent: 'experience', item: 'dinner-cruise', label: 'Experience Agent books a dinner cruise' },
   hotel: { agent: 'booking', item: 'hotel-b', label: 'Hotel Agent compares hotels, Booking Agent books' },
   'airport-transfer': { agent: 'travel', item: 'airport-transfer', label: 'Travel Agent adds an airport transfer' },
+  // office procurement: the Purchasing Agent holds the booking role
+  'usb-adapter': { agent: 'booking', item: 'usb-adapter', label: 'Purchasing Agent orders adapters' },
+  'gaming-gpu': { agent: 'booking', item: 'gaming-gpu', label: 'Purchasing Agent tries a gaming graphics card' },
 };
 
 export async function propose(

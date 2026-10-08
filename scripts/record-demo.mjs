@@ -22,7 +22,7 @@ const ORIGIN = (process.argv[2] || 'http://localhost:3100').replace(/\/$/, '');
 const APP = `${ORIGIN}/intentchain`;
 const OUT = path.resolve('video');
 const VOICE = process.env.VOICE || 'Samantha';
-const RATE = process.env.RATE || '172';
+const RATE = process.env.RATE || '178';
 const HEADED = process.env.HEADED === '1';
 const VIEW = { width: 1120, height: 630 }; // small viewport, recorded at 1080p, so text stays readable
 
@@ -46,17 +46,25 @@ function speak(id, text) {
 
 const SCENES = [
   {
-    id: 'intro',
-    say: 'A ten-person company has no travel desk and no procurement team. AI agents could do that work. But no owner wants to hand an AI the company’s money. This is IntentChain: autonomous travel and procurement for small businesses, built on PayPal.',
+    id: 'hook',
+    say: 'AI agents are about to spend your company’s money. The question is not whether they can pay. It is whether you would ever know why they did.',
     do: async (p) => {
-      await card(p, ['Ten people. No travel desk. No procurement team.', 'AI agents could do the work.', 'Would you hand them the company’s money?']);
+      await card(p, ['AI agents are about to spend your company’s money.', 'Would you ever know why?'], 54);
+      await sleep(9000);
+    },
+  },
+  {
+    id: 'intro',
+    say: 'A ten-person company has no travel desk and no procurement team. This is IntentChain: autonomous travel and procurement for small businesses, built on PayPal. Let AI spend. Keep your business in control.',
+    do: async (p) => {
+      await card(p, ['Ten people. No travel desk. No procurement team.', 'IntentChain', 'Let AI spend. Keep your business in control.']);
       await sleep(10500);
       await card(p, null);
     },
   },
   {
     id: 'policy',
-    say: 'The owner sets the rules once: what agents may buy, a trip budget, and an auto-pay limit of one hundred and fifty dollars. Above that, a manager approves. PayPal is connected once, through a billing agreement.',
+    say: 'The owner sets the rules once: what agents may buy, a trip budget, and an auto-pay limit. Above it, a manager approves.',
     do: async (p) => {
       await view(p, '.panel');
     },
@@ -86,7 +94,7 @@ const SCENES = [
       await sleep(1000);
       await guide(p);
       await view(p, '.note.block');
-      await sleep(7500);
+      await sleep(6000);
       await guide(p);
       await view(p, '.checks');
     },
@@ -106,7 +114,7 @@ const SCENES = [
       await sleep(2000);
       await guide(p);
       await view(p, '.branch');
-      await sleep(10000);
+      await sleep(9000);
       await guide(p);
       await view(p, '.checks');
     },
@@ -118,7 +126,7 @@ const SCENES = [
       await guide(p);
       await view(p, '.checks');
       await click(p, p.getByRole('button', { name: 'Why this payment?' }));
-      await sleep(4000);
+      await sleep(3000);
       await click(p, p.getByRole('button', { name: 'Close' }));
       await pay(p);
       await view(p, '.checks');
@@ -135,21 +143,32 @@ const SCENES = [
   },
   {
     id: 'reconcile',
-    say: 'Every order and refund is read back from PayPal and matched to our ledger. And any outside agent can act under a signed grant token, and meets the same firewall.',
+    say: 'Every order and refund is read back from PayPal, and matched to our ledger.',
     do: async (p) => {
       await guide(p, 3500);
       await view(p, '.reconcile');
-      await sleep(3500);
-      await p.locator('details.byo summary').click();
-      await view(p, 'details.byo');
+    },
+  },
+  {
+    id: 'office',
+    say: 'And it is not just travel. Under the same policy, adapters for new hires are auto-paid, and a gaming graphics card is blocked.',
+    do: async (p) => {
+      await p.evaluate(() => window.scrollTo({ top: 0, behavior: 'smooth' }));
+      await sleep(800);
+      await guide(p, 3500); // reset, then submit the office request
+      await guide(p, 2500); // confirm & delegate
+      await guide(p, 3000); // adapters → auto-pay
+      await view(p, '.checks');
+      await guide(p, 2500); // graphics card → blocked
+      await view(p, '.checks');
     },
   },
   {
     id: 'outro',
-    say: 'Let AI spend. Keep your business in control. IntentChain. Trust the chain, not just the agent.',
+    say: 'Agents can delegate tasks. They should not be able to delegate away your intent. IntentChain. Trust the chain, not just the agent.',
     do: async (p) => {
-      await card(p, ['Let AI spend. Keep your business in control.', 'IntentChain', 'Trust the chain, not just the agent.']);
-      await sleep(7500);
+      await card(p, ['IntentChain', 'Let AI spend. Keep your business in control.', 'Trust the chain, not just the agent.']);
+      await sleep(8500);
     },
   },
 ];
@@ -157,8 +176,8 @@ const SCENES = [
 // ---- on-screen helpers ----
 
 /** Full-screen caption card for the opening and closing. Pass null to remove it. */
-async function card(p, lines) {
-  await p.evaluate((lines) => {
+async function card(p, lines, size = 40) {
+  await p.evaluate(({ lines, size }) => {
     document.getElementById('demo-card')?.remove();
     if (!lines) return;
     const el = document.createElement('div');
@@ -166,7 +185,7 @@ async function card(p, lines) {
     el.style.cssText =
       'position:fixed;inset:0;z-index:999;display:grid;place-content:center;gap:18px;text-align:center;padding:40px;' +
       'background:radial-gradient(900px 500px at 70% 0%,rgba(107,147,255,.22),transparent 60%),#0a0f1e;color:#e8edff;' +
-      'font:700 40px/1.25 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;letter-spacing:-.5px';
+      `font:700 ${size}px/1.2 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;letter-spacing:-.5px`;
     for (const [i, line] of lines.entries()) {
       const row = document.createElement('div');
       row.textContent = line;
@@ -174,7 +193,7 @@ async function card(p, lines) {
       el.appendChild(row);
     }
     document.body.appendChild(el);
-  }, lines);
+  }, { lines, size });
 }
 
 /** Flashes a ring around the element, then clicks it, so the viewer can see what was pressed. */

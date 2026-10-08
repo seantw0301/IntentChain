@@ -97,6 +97,28 @@ export const ITEMS: Record<string, CatalogItem> = {
     nights: 3,
     reference_score: 93,
   },
+  'usb-adapter': {
+    id: 'usb-adapter',
+    name: 'USB-C Multiport Adapters (3-pack)',
+    merchant: 'Office Supply Co',
+    description: 'Laptop adapters for the three new hires',
+    amount: 49,
+    category: 'office',
+    location: 'Office',
+    day_offset: 0,
+    reference_score: 92,
+  },
+  'gaming-gpu': {
+    id: 'gaming-gpu',
+    name: 'Gaming Graphics Card',
+    merchant: 'PC Parts Outlet',
+    description: 'High-end GPU',
+    amount: 799,
+    category: 'gaming',
+    location: 'Office',
+    day_offset: 0,
+    reference_score: 5,
+  },
   'airport-transfer': {
     id: 'airport-transfer',
     name: 'Airport Transfer — Private Car',
@@ -156,12 +178,14 @@ const LEISURE_DEFAULT: Record<Category, number> = {
 
 /** Reference alignment score, used only when the live AI is unavailable. */
 export function referenceScore(intent: Intent, item: CatalogItem): number {
+  // an office purchase request is served by office supplies and little else
+  if (intent.kind === 'procurement') return item.reference_score ?? (item.category === 'office' ? 85 : 15);
   if (intent.purpose === 'business') return item.reference_score ?? BUSINESS_DEFAULT[item.category];
   return LEISURE_DEFAULT[item.category];
 }
 
 export function referenceReason(intent: Intent, item: CatalogItem, score: number): string {
-  const trip = `a ${intent.purpose} trip (${intent.purpose_detail})`;
+  const trip = intent.kind === 'procurement' ? `the request (${intent.purpose_detail})` : `a ${intent.purpose} trip (${intent.purpose_detail})`;
   if (score >= 65) return `${cap(item.category)} directly supports ${trip}.`;
   if (score >= 40) return `${cap(item.category)} is only loosely related to ${trip}.`;
   return `${cap(item.category)} does not serve ${trip}.`;

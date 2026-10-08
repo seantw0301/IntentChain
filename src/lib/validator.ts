@@ -1,7 +1,7 @@
 import { spent } from './audit';
 import { referenceReason, referenceScore } from './catalog';
 import { list } from './db';
-import { delegationFor, verifyChain } from './delegation';
+import { ROLE_LABELS, delegationFor, verifyChain } from './delegation';
 import { checkPolicy, getPolicy } from './policy';
 import { asChoice, asScore, ask } from './jev';
 import type {
@@ -35,13 +35,14 @@ function checkBudget(intent: Intent, item: CatalogItem, alreadySpent: number): C
   };
 }
 
-function checkAuthority(agent: AgentRole, delegation: Delegation | null, chain: Delegation[], item: CatalogItem): Check {
-  if (!delegation) return { pass: false, detail: `The ${agent} agent holds no delegation.` };
+function checkAuthority(role: AgentRole, delegation: Delegation | null, chain: Delegation[], item: CatalogItem): Check {
+  const agent = delegation?.label ?? ROLE_LABELS[role];
+  if (!delegation) return { pass: false, detail: `The ${agent} holds no delegation.` };
   if (delegation.status !== 'ACTIVE') {
-    return { pass: false, detail: `The ${agent} agent's delegation is ${delegation.status}.` };
+    return { pass: false, detail: `The ${agent}'s delegation is ${delegation.status}.` };
   }
   if (new Date(delegation.expires_at).getTime() < Date.now()) {
-    return { pass: false, detail: `The ${agent} agent's delegation has expired.` };
+    return { pass: false, detail: `The ${agent}'s delegation has expired.` };
   }
   // effective limit = the tightest limit anywhere up the chain
   const limit = Math.min(...chain.map((d) => d.budget));
@@ -67,9 +68,9 @@ function checkAuthority(agent: AgentRole, delegation: Delegation | null, chain: 
   }
   const granted = chain.map((d) => d.scope.categories).find((c) => c !== undefined);
   if (granted && !granted.includes(item.category)) {
-    return { pass: false, detail: `The ${agent} agent may only buy: ${granted.join(', ')}` };
+    return { pass: false, detail: `The ${agent} may only buy: ${granted.join(', ')}` };
   }
-  return { pass: true, detail: `${usd(item.amount)} is within the ${agent} agent's limit of ${usd(limit)}` };
+  return { pass: true, detail: `${usd(item.amount)} is within the ${agent}'s limit of ${usd(limit)}` };
 }
 
 /** Scope is about where and when — never about what is being bought. */
@@ -99,7 +100,7 @@ const ALIGNMENT_RUBRIC = [
 
 const REASONS: Record<string, string> = {
   essential: 'Needed to achieve the goal',
-  supports: 'Supports the logistics of the trip',
+  supports: 'Supports carrying out the request',
   convenience: 'Mostly a personal convenience, not clearly needed for the goal',
   different_purpose: 'Serves leisure or a different purpose than the stated goal',
 };
@@ -115,7 +116,7 @@ async function checkIntent(session: string, intent: Intent, item: CatalogItem, d
       human_intent: {
         goal: intent.goal,
         purpose: intent.purpose_detail,
-        trip_type: intent.purpose,
+        kind: intent.kind === 'procurement' ? 'office purchase' : `${intent.purpose} trip`,
       },
       proposed_purchase: {
         name: item.name,
@@ -169,15 +170,6 @@ async function checkIntent(session: string, intent: Intent, item: CatalogItem, d
   return { status, score, detail: `${reason} · Alignment ${score}`, restriction: null, source };
 }
 
-const AGENT_NAMES: Record<AgentRole, string> = {
-  travel: 'Travel Agent',
-  hotel: 'Hotel Agent',
-  booking: 'Booking Agent',
-  experience: 'Experience Agent',
-  custom: 'Your Agent',
-  recovery: 'Recovery Agent',
-};
-
 /**
  * The firewall between an agent and PayPal. Five independent checks:
  *   Policy    — does the company allow this kind of purchase at all?
@@ -225,11 +217,13 @@ export async function evaluate(
   }
 
   // responsibility: which agent, or which hop of the chain, introduced the problem
-  const who = AGENT_NAMES[agent];
+  const who = delegation?.label ?? ROLE_LABELS[agent];
+  const nameOf = (role: Delegation['from']) =>
+    role === 'human' ? 'Requester' : (chain.find((d) => d.agent === role)?.label ?? ROLE_LABELS[role]);
   const blame = (type: string): Violation => ({ source: who, type, delegation_id: delegation?.id ?? null });
   const hop = drifted
     ? {
-        source: `${drifted.from === 'human' ? 'Requester' : AGENT_NAMES[drifted.from]} → ${AGENT_NAMES[drifted.agent]} delegation`,
+        source: `${nameOf(drifted.from)} → ${drifted.label ?? ROLE_LABELS[drifted.agent]} delegation`,
         type: `Intent drift (fidelity ${drifted.fidelity?.score ?? '?'}%)`,
         delegation_id: drifted.id,
       }
@@ -264,7 +258,7 @@ export async function evaluate(
     reason_code = hop ? 'INTENT_DRIFT' : 'INTENT_MISMATCH';
     headline = hop
       ? 'Every policy check passed — allowed category, within budget, within authority — but this is not what the employee was sent to do.'
-      : `This purchase fits the budget, the authority and the scope — but not the original ${intent.purpose}-trip intent.`;
+      : 'This purchase fits the budget, the authority and the scope — but not what was originally asked for.';
     violation = hop ?? blame('Intent mismatch');
   } else if (intentCheck.status === 'warning') {
     decision = 'WARNING';

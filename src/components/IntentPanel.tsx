@@ -47,8 +47,12 @@ export function IntentPanel({ state, call, busy }: { state: AppState; call: Call
             <span className="chip" key={k}>{k} ≤ ${v}</span>
           ))}
         </dd>
-        <dt>Dates</dt>
-        <dd>{intent.trip_start} → {intent.trip_end} ({intent.nights} nights)</dd>
+        <dt>{intent.kind === 'procurement' ? 'Deliver by' : 'Dates'}</dt>
+        <dd>
+          {intent.kind === 'procurement'
+            ? intent.trip_end
+            : `${intent.trip_start} → ${intent.trip_end} (${intent.nights} nights)`}
+        </dd>
         <dt>Company blocks</dt>
         <dd className="chips">
           {intent.restrictions.map((r) => (

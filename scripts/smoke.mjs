@@ -233,5 +233,27 @@ check('another browser session sees none of this', r.json.intent === null && r.j
 r = await api('POST', 'demo/reset');
 check('reset empties the session', r.json.intent === null && r.json.transactions.length === 0 && r.json.events.length === 0);
 
+// the same policy and firewall, a different kind of request: an office purchase
+r = await api('POST', 'intent', { prompt: 'Order laptops and monitors for the whole team. Budget: $900.' });
+check('office purchase above the company procurement budget is refused', r.status === 422 && r.json.error?.code === 'OVER_COMPANY_BUDGET', JSON.stringify(r.json.error));
+r = await api('POST', 'intent', { prompt: 'Order USB-C adapters for the three new hires starting Monday. Budget: $200.' });
+const proc = r.json.intent;
+check('office purchase request is recognised', proc?.kind === 'procurement' && proc.id === 'PROC-001' && proc.budget === 200, JSON.stringify(proc));
+r = await api('POST', `intent/${proc.id}/confirm`);
+check('procurement chain: Procurement → Sourcing → Purchasing, office supplies only',
+  r.json.delegations?.map((x) => x.label).join(' > ') === 'Procurement Agent > Sourcing Agent > Purchasing Agent' &&
+  r.json.delegations.every((x) => x.scope.categories?.join() === 'office'), JSON.stringify(r.json.delegations?.map((x) => x.label)));
+r = await api('POST', 'transaction/evaluate', { step: 'usb-adapter' });
+tx = last(r.json);
+check('adapters $49: all five checks pass, auto-pay',
+  tx.validation.decision === 'APPROVED' && tx.validation.payment_route === 'AUTO_PAY' && (!r.json.autopay.connected || tx.status === 'CAPTURED'),
+  JSON.stringify(tx.validation));
+r = await api('POST', 'transaction/evaluate', { step: 'gaming-gpu' });
+tx = last(r.json);
+check('gaming graphics card $799: blocked by company policy, Purchasing Agent named',
+  tx.status === 'BLOCKED' && tx.validation.reason_code === 'POLICY_VIOLATION' && tx.validation.violation?.source === 'Purchasing Agent',
+  JSON.stringify(tx.validation));
+await api('POST', 'demo/reset');
+
 console.log(failures ? `\n${failures} check(s) failed.` : '\nAll checks passed.');
 process.exit(failures ? 1 : 0);

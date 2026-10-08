@@ -17,6 +17,7 @@ function defaults(): CompanyPolicy {
     company: 'Acme Studio',
     travel_budget: 800,
     hotel_limit: 500,
+    procurement_budget: 500,
     auto_pay_limit: 150,
     allowed_categories: ['lodging', 'connectivity', 'transport', 'meals', 'office'],
     blocked_categories: ['entertainment', 'subscription', 'gaming'],
@@ -25,7 +26,8 @@ function defaults(): CompanyPolicy {
 }
 
 export function getPolicy(session: string): CompanyPolicy {
-  return get<CompanyPolicy>('policies', session, POLICY_ID) ?? defaults();
+  // fill in fields added after a visitor's policy was first stored
+  return { ...defaults(), ...(get<CompanyPolicy>('policies', session, POLICY_ID) ?? {}) };
 }
 
 const money = (v: unknown, name: string, max: number): number => {

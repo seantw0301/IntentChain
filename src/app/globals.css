@@ -325,3 +325,13 @@ details.byo pre { margin: 8px 0; padding: 10px 12px; background: #0b1227; border
 input.inline { width: 78px; padding: 4px 8px; margin: 0 2px; }
 .kv dd.row { gap: 4px; font-weight: 600; }
 .kv dd .hint { font-weight: 400; }
+
+/* company ledger (AG Grid) */
+.ledger .ledger-tag { font-weight: 700; font-size: 12px; letter-spacing: 0.3px; }
+.ledger .ledger-tag.ok { color: var(--pass); }
+.ledger .ledger-tag.no { color: var(--block); }
+.ledger .ledger-tag.wait { color: var(--warn); }
+.ledger .ledger-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; }
+.ledger .ledger-focus { box-shadow: inset 3px 0 0 var(--accent); }
+.ledger .ag-row { cursor: pointer; }
+.ledger .ag-row-pinned { font-weight: 700; cursor: default; }

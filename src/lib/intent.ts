@@ -10,6 +10,7 @@ import type { Delegation, Intent, Restriction } from './types';
 const CITIES = ['Tokyo', 'Osaka', 'Kyoto', 'Seoul', 'Singapore', 'London', 'Paris', 'New York'];
 
 interface Extracted {
+  kind: 'travel' | 'procurement';
   goal: string;
   purpose: 'business' | 'leisure';
   purpose_detail: string;
@@ -29,10 +30,15 @@ function parseAmount(text: string): number | null {
 function extractByRules(prompt: string): Extracted | null {
   const budget = parseAmount(prompt);
   if (!budget) return null;
+  // buying things for the office, with no travel involved
+  if (/\b(order|buy|purchase|restock|procure\w*|suppl\w+|adapters?|keyboards?|monitors?|equipment)\b/i.test(prompt) && !/\b(trip|travel\w*|hotel|flight)\b/i.test(prompt)) {
+    return { kind: 'procurement', goal: 'Office procurement', purpose: 'business', purpose_detail: 'Equipment for the team', location: 'Office', budget };
+  }
   const location = CITIES.find((c) => new RegExp(`\\b${c}\\b`, 'i').test(prompt)) ?? 'Tokyo';
   const business = /\b(business|client|meeting|conference|work)\b/i.test(prompt);
   const detail = /client meeting/i.test(prompt) ? 'Client meeting' : business ? 'Business travel' : 'Leisure travel';
   return {
+    kind: 'travel',
     goal: `${location} ${business ? 'business' : 'leisure'} trip`,
     purpose: business ? 'business' : 'leisure',
     purpose_detail: detail,
@@ -41,7 +47,8 @@ function extractByRules(prompt: string): Extracted | null {
   };
 }
 
-const PURPOSES: Record<string, { type: 'business' | 'leisure'; label: string; when: string }> = {
+const PURPOSES: Record<string, { type: 'business' | 'leisure'; label: string; when: string; procurement?: boolean }> = {
+  office_purchase: { type: 'business', label: 'Equipment for the team', when: 'Not a trip: buying equipment or supplies for the office or team.', procurement: true },
   client_meeting: { type: 'business', label: 'Client meeting', when: 'Meeting a client or customer.' },
   conference: { type: 'business', label: 'Conference', when: 'Attending a conference, trade show or training.' },
   business_other: { type: 'business', label: 'Business travel', when: 'Other work travel.' },
@@ -60,7 +67,7 @@ async function extractByAi(session: string, prompt: string, budget: number): Pro
     {
       purpose: {
         type: 'choice',
-        instructions: 'What is the trip in `request` for?',
+        instructions: 'What is `request` for?',
         criteria: Object.fromEntries(Object.entries(PURPOSES).map(([k, v]) => [k, v.when])),
       },
       city: {
@@ -76,8 +83,12 @@ async function extractByAi(session: string, prompt: string, budget: number): Pro
   const purpose = PURPOSES[asChoice(answers?.purpose)?.choice ?? ''];
   const city = asChoice(answers?.city)?.choice;
   if (!purpose || !city) return null; // fails structural validation → fall back to rules
+  if (purpose.procurement) {
+    return { kind: 'procurement', goal: 'Office procurement', purpose: 'business', purpose_detail: purpose.label, location: 'Office', budget };
+  }
   const location = city === 'unknown' ? 'Tokyo' : city;
   return {
+    kind: 'travel',
     goal: `${location} ${purpose.type} trip`,
     purpose: purpose.type,
     purpose_detail: purpose.label,
@@ -101,7 +112,7 @@ function nextWeekTuesday(): string {
 
 export async function createIntent(session: string, prompt: string): Promise<Intent> {
   const text = prompt.trim();
-  if (text.length < 8) throw new ApiError(400, 'PROMPT_TOO_SHORT', 'Describe the trip and the budget.');
+  if (text.length < 8) throw new ApiError(400, 'PROMPT_TOO_SHORT', 'Describe what is needed and the budget.');
   if (text.length > 600) throw new ApiError(400, 'PROMPT_TOO_LONG', 'Keep the request under 600 characters.');
   if (list<Intent>('intents', session).some((i) => i.status === 'ACTIVE')) {
     throw new ApiError(409, 'INTENT_ACTIVE', 'An intent is already active. Reset the demo to start again.');
@@ -115,30 +126,36 @@ export async function createIntent(session: string, prompt: string): Promise<Int
   const extracted = fromAi ?? byRules;
   // the request must fit inside the company policy, the same way every grant must fit inside its parent
   const policy = getPolicy(session);
-  if (extracted.budget > policy.travel_budget) {
+  const procurement = extracted.kind === 'procurement';
+  const ceiling = procurement ? policy.procurement_budget : policy.travel_budget;
+  if (extracted.budget > ceiling) {
     throw new ApiError(
       422,
       'OVER_COMPANY_BUDGET',
-      `${policy.company} allows up to $${policy.travel_budget} per trip. This request asks for $${extracted.budget}.`,
+      `${policy.company} allows up to $${ceiling} per ${procurement ? 'purchase request' : 'trip'}. This request asks for $${extracted.budget}.`,
     );
   }
 
-  const nights = 3;
-  const trip_start = nextWeekTuesday();
+  const today = new Date().toISOString().slice(0, 10);
+  const nights = procurement ? 0 : 3;
+  // a trip is next week; an office order must arrive within two weeks
+  const trip_start = procurement ? today : nextWeekTuesday();
   const intent: Intent = {
-    id: 'TRIP-001',
+    id: procurement ? 'PROC-001' : 'TRIP-001',
     status: 'DRAFT',
     prompt: text,
     ...extracted,
     currency: 'USD',
-    // lodging is capped by the company hotel limit and by 5/6 of this trip's budget; connectivity at $40
-    category_caps: {
-      lodging: Math.min(policy.hotel_limit, Math.round((extracted.budget * 5) / 6)),
-      connectivity: Math.min(40, extracted.budget),
-    },
+    category_caps: procurement
+      ? { office: extracted.budget }
+      : {
+          // lodging is capped by the company hotel limit and by 5/6 of this trip's budget; connectivity at $40
+          lodging: Math.min(policy.hotel_limit, Math.round((extracted.budget * 5) / 6)),
+          connectivity: Math.min(40, extracted.budget),
+        },
     restrictions: restrictionsFrom(policy.blocked_categories),
     trip_start,
-    trip_end: addDays(trip_start, nights),
+    trip_end: addDays(trip_start, procurement ? 14 : nights),
     nights,
     source: fromAi ? 'jev' : 'cached',
     created_at: new Date().toISOString(),
