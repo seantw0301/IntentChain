@@ -1,0 +1,20 @@
+{
+  "comment": "Narration for the assembled video: when each line starts (seconds) and what is said. Used by scripts/revoice.mjs.",
+  "voice": "af_heart",
+  "speed": 1.08,
+  "cues": [
+    { "at": 0.4, "text": "AI can follow every rule, and still do the wrong thing. You asked for a client meeting in Tokyo. Two hand-offs later, an agent paid for a dinner cruise." },
+    { "at": 10.2, "text": "Let AI spend. Keep your business in control. Small purchases auto-pay. Big ones wait for a manager. Drift gets blocked." },
+    { "at": 20.2, "text": "Intent Chain Business Agent. Channel Three finds it. Claude agents decide. Intent Chain checks every hand-off. PayPal pays. A.G. Grid records it." },
+    { "at": 30.1, "text": "An employee needs a trip to Tokyo for a client meeting. The request becomes a structured intent, and authority flows down a chain of agents. Each grant is smaller than its parent: less money, narrower scope, fewer PayPal tools. Every grant is signed." },
+    { "at": 45.2, "text": "The travel agent buys an eighteen dollar E-SIM. Five checks pass, and it is under the limit, so PayPal pays instantly, with nobody in the loop." },
+    { "at": 55.0, "text": "Now an attack. An agent requests a grant with the same five hundred dollars, plus one new capability. Same amount, but not a subset. Rejected." },
+    { "at": 68.5, "text": "A theme park ticket? The company blocks entertainment. Any expense policy would catch that." },
+    { "at": 74.3, "text": "Here is what a policy cannot catch. The travel agent hands off a vague task: improve the overall travel experience. A valid subset, so no rule rejects it. But its intent fidelity drops. Now a real language model acts as that agent. It knows the company policy, so it looks for something the policy allows, and books a sunset dinner cruise as a business meal. Allowed category. In budget. Within authority. Every policy check passes. But it is not what the employee was sent to do. Blocked, and traced to the exact hand-off where the intent drifted." },
+    { "at": 110.8, "text": "The hotel is four hundred and eighty six dollars: over the limit. The agent records why it rejected the alternatives, and the manager approves in PayPal." },
+    { "at": 133.1, "text": "Then the hotel cancels. The payment succeeded. The goal did not. Intent Chain refunds through PayPal, and proposes a replacement." },
+    { "at": 142.0, "text": "Every order and refund is read back from PayPal, and matched to our ledger." },
+    { "at": 147.5, "text": "And it is not just travel. Under the same policy, adapters for new hires are auto-paid, and a gaming graphics card is blocked." },
+    { "at": 164.8, "text": "Agents can delegate tasks. They should not be able to delegate away your intent. Intent Chain Business Agent. Trust the chain, not just the agent." }
+  ]
+}

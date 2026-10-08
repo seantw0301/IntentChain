@@ -45,7 +45,7 @@ const clips = LINES.map(([at, text], i) => {
 });
 
 const browser = await chromium.launch();
-const context = await browser.newContext({ viewport: { width: 1280, height: 720 }, recordVideo: { dir: OUT, size: { width: 1920, height: 1080 } } });
+const context = await browser.newContext({ viewport: { width: 1280, height: 720 }, recordVideo: { dir: OUT, size: { width: 1280, height: 720 } } }); // same size as the page: a larger size is padded, not scaled
 const page = await context.newPage();
 const t0 = Date.now();
 await page.goto(`file://${path.join(here, PAGES[variant])}${query}`);
