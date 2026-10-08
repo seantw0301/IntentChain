@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>IntentChain Business Agent — opening (illustrated frames)</title>
+<style>
+  /* The first 30 seconds built from three finished illustrations. Each one is
+     revealed left to right, the way the story reads, with a slow push-in.
+     Images are read from ../video/intro-assets/ — pass ?f=1,3,5 to choose
+     which three files (by name, without extension) are used. */
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #060a18; }
+  .frame { position: fixed; inset: 0; opacity: 0; transition: opacity 0.6s ease; }
+  .frame img { width: 100%; height: 100%; object-fit: cover; transform: scale(1.0); transition: transform 10s linear; }
+  /* a soft-edged wipe: what is to the right of --at stays dark until its moment */
+  .frame::after { content: ''; position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(90deg, transparent calc(var(--at) - 6%), rgba(6, 10, 24, 0.94) var(--at));
+    transition: --at 0s; }
+  @property --at { syntax: '<percentage>'; inherits: true; initial-value: 28%; }
+  .frame { --at: 28%; }
+  .frame.on { opacity: 1; animation: wipe var(--wipe, 6s) cubic-bezier(.4, 0, .3, 1) 0.9s forwards; }
+  .frame.on img { transform: scale(1.05); }
+  .frame.off { opacity: 0; }
+  @keyframes wipe { to { --at: 112%; } }
+</style>
+</head>
+<body>
+<section class="frame" id="f1"><img alt=""></section>
+<section class="frame" id="f2"><img alt=""></section>
+<section class="frame" id="f3" style="--wipe: 5s"><img alt=""></section>
+<script>
+  const names = (new URLSearchParams(location.search).get('f') || '2,4,5').split(',');
+  const frames = [...document.querySelectorAll('.frame')];
+  frames.forEach((f, i) => (f.querySelector('img').src = `../video/intro-assets/${names[i]}.webp`));
+  // each frame holds for ten seconds
+  frames.forEach((f, i) => {
+    setTimeout(() => f.classList.add('on'), i * 10000 + 100);
+    if (i < frames.length - 1) setTimeout(() => f.classList.add('off'), (i + 1) * 10000);
+  });
+</script>
+</body>
+</html>

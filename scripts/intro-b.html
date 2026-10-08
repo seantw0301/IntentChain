@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>IntentChain Business Agent — opening (product style)</title>
+<style>
+  /* The first 30 seconds, drawn in the product's own visual language so the
+     opening and the demo read as one thing. Three frames, each the same cast
+     with one thing added. Classes b1…b21 on <body> drive the timing. */
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; }
+  body {
+    font-family: -apple-system, 'SF Pro Display', 'Helvetica Neue', Arial, sans-serif; color: #e8edff;
+    background: radial-gradient(900px 520px at 82% -8%, rgba(107, 147, 255, 0.22), transparent 60%),
+                radial-gradient(700px 420px at 0% 100%, rgba(47, 208, 143, 0.10), transparent 60%), #0a0f1e;
+  }
+  .frame { position: fixed; inset: 0; padding: 40px 56px; opacity: 0; transition: opacity 0.5s ease; }
+  h1 { margin: 0; font-size: 58px; line-height: 1.02; letter-spacing: -1.2px; font-weight: 900; text-transform: uppercase; }
+  h1 .hi { color: #6bd0ff; }
+  .pop { opacity: 0; transform: translateY(14px) scale(0.97); transition: opacity 0.4s ease, transform 0.45s cubic-bezier(.2,.9,.3,1.2); }
+  svg { display: block; }
+  .ico { fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* cast */
+  .actor { position: absolute; width: 200px; text-align: center; }
+  .actor .face { width: 124px; height: 124px; margin: 0 auto 8px; border-radius: 28px; display: grid; place-items: center;
+                 background: #16203f; border: 1.5px solid #2c3b6b; color: #9db8ff; }
+  .actor.human .face { border-radius: 50%; background: #23304f; color: #ffd9a8; border-color: #5a6a93; }
+  .actor b { display: block; font-size: 23px; }
+  .actor span { display: block; font-size: 16px; color: #9fb0da; line-height: 1.25; }
+  .bubble { position: absolute; padding: 9px 14px; border-radius: 16px 16px 16px 4px; background: #f2f5ff; color: #121a33; font-size: 17px; font-weight: 600; }
+  .arrow { position: absolute; font-size: 38px; color: #6f86c4; font-weight: 300; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 800; letter-spacing: 1px; padding: 3px 9px; border-radius: 999px; background: #16203f; border: 1px solid #2c3b6b; color: #9fb0da; }
+
+  /* frame 1 */
+  .buy { position: absolute; width: 300px; border-radius: 18px; overflow: hidden; background: #111933; border: 2px solid #2c3b6b; }
+  .buy .pic { height: 132px; display: grid; place-items: center; color: #ffd27a;
+              background: linear-gradient(180deg, #1a2550 0%, #2a2f6a 55%, #14306a 56%, #0d1f4a 100%); }
+  .buy .txt { padding: 12px 16px; font-size: 24px; font-weight: 800; }
+  .buy .txt small { display: block; font-size: 30px; }
+  .paid { position: absolute; right: 14px; bottom: 96px; padding: 4px 12px; border: 3px solid #2fd08f; color: #2fd08f; font-weight: 900; font-size: 22px;
+          letter-spacing: 2px; transform: rotate(-9deg) scale(1.8); opacity: 0; transition: all 0.25s cubic-bezier(.3,1.5,.5,1); border-radius: 6px; }
+  .checks { position: absolute; width: 232px; border-radius: 16px; background: #111933; border: 1.5px solid #2c3b6b; overflow: hidden; }
+  .checks div { display: flex; justify-content: space-between; align-items: center; padding: 11px 16px; font-size: 20px; border-bottom: 1px solid #1f2b52;
+                opacity: 0; transform: translateX(14px); transition: all 0.3s ease; }
+  .checks div:last-child { border-bottom: 0; }
+  .dot { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-weight: 900; font-size: 18px; color: #06102a; background: #2fd08f; }
+  .dot.q { background: #f6b84b; } .dot.x { background: #ff5f6e; color: #fff; }
+  .ask { position: absolute; left: 56px; bottom: 52px; font-size: 52px; font-weight: 900; letter-spacing: -0.8px; color: #ffb3ba; }
+
+  /* frame 2 */
+  .policy { position: absolute; left: 56px; top: 232px; width: 330px; border-radius: 18px; background: #111933; border: 1.5px solid #2c3b6b; padding: 16px 18px; }
+  .policy h3 { margin: 0 0 10px; font-size: 15px; letter-spacing: 1.4px; text-transform: uppercase; color: #9fb0da; display: flex; align-items: center; gap: 10px; }
+  .policy p { margin: 0; padding: 10px 0; font-size: 22px; font-weight: 700; border-top: 1px solid #1f2b52; display: flex; align-items: center; gap: 12px; }
+  .policy p i { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: #1c2a56; color: #9db8ff; font-style: normal; }
+  .policy p.no i { background: rgba(255, 95, 110, 0.18); color: #ff8f99; }
+  .mini { position: absolute; left: 430px; width: 170px; padding: 10px 12px; border-radius: 16px; background: #111933; border: 1.5px solid #2c3b6b; display: flex; align-items: center; gap: 10px; font-size: 18px; font-weight: 700; }
+  .mini .face { width: 46px; height: 46px; border-radius: 14px; background: #16203f; display: grid; place-items: center; color: #9db8ff; flex: 0 0 auto; }
+  .shield { position: absolute; left: 648px; top: 344px; width: 178px; padding: 18px 10px; text-align: center; border-radius: 22px;
+            background: linear-gradient(180deg, #152654, #0f1a3a); border: 2px solid #5b8cff; box-shadow: 0 0 44px rgba(91, 140, 255, 0.45); color: #8fb2ff; }
+  .shield b { display: block; margin-top: 8px; font-size: 22px; color: #fff; }
+  .shield span { font-size: 13px; color: #9fb0da; }
+  .out { position: absolute; left: 872px; width: 352px; padding: 13px 16px; border-radius: 18px; background: #111933; border: 2px solid; }
+  .out .what { font-size: 24px; font-weight: 800; }
+  .out .pill { display: inline-block; margin-top: 7px; padding: 5px 14px; border-radius: 999px; font-weight: 900; font-size: 16px; letter-spacing: 0.8px; color: #06102a; }
+  .out .to { float: right; margin-top: 10px; font-size: 16px; font-weight: 800; color: #cfe0ff; }
+  .out .why { margin-top: 7px; font-size: 15px; color: #ffb3ba; }
+  .out .five { letter-spacing: 3px; font-weight: 900; }
+  .out.ok { border-color: #2fd08f; } .out.ok .pill { background: #2fd08f; }
+  .out.wait { border-color: #f6b84b; } .out.wait .pill { background: #f6b84b; }
+  .out.no { border-color: #ff5f6e; background: rgba(255, 95, 110, 0.08); } .out.no .pill { background: #ff5f6e; color: #fff; }
+
+  /* frame 3 */
+  .rail { position: absolute; left: 56px; right: 56px; top: 262px; display: grid; grid-template-columns: repeat(5, 1fr); gap: 34px; }
+  .stop { position: relative; text-align: center; padding: 20px 10px 18px; border-radius: 20px; background: #111933; border: 1.5px solid #2c3b6b; }
+  .stop:not(:last-child)::after { content: '→'; position: absolute; right: -30px; top: 76px; font-size: 30px; color: #6f86c4; }
+  .stop .verb { font-size: 14px; font-weight: 900; letter-spacing: 3px; color: #6bd0ff; }
+  .stop .face { width: 84px; height: 84px; margin: 12px auto; border-radius: 24px; display: grid; place-items: center; background: #16203f; color: #9db8ff; }
+  .stop b { display: block; font-size: 25px; letter-spacing: -0.3px; }
+  .stop span { display: block; margin-top: 6px; font-size: 15px; line-height: 1.3; color: #9fb0da; }
+  .stop.core { border-color: #5b8cff; box-shadow: 0 0 40px rgba(91, 140, 255, 0.4); background: linear-gradient(180deg, #152654, #0f1a3a); }
+  .stop.core .face { color: #fff; background: #20418f; }
+  .loop { position: absolute; left: 56px; right: 56px; bottom: 54px; text-align: center; font-size: 25px; color: #c3cdec; }
+  .loop b { color: #fff; }
+  .name { position: absolute; left: 56px; top: 176px; font-size: 24px; color: #9fb0da; }
+  .name b { color: #fff; }
+
+  /* ---- timing ---- */
+  body.b1 #f1 { opacity: 1; }
+  body.b2 .a1, body.b3 .a2, body.b4 .a3, body.b5 .a4, body.b7 .a6 { opacity: 1; transform: none; }
+  body.b5 .paid { opacity: 1; transform: rotate(-9deg) scale(1); transition-delay: 0.5s; }
+  body.b6 .checks.c1 div { opacity: 1; transform: none; }
+  .checks div:nth-child(2) { transition-delay: 0.16s; } .checks div:nth-child(3) { transition-delay: 0.32s; } .checks div:nth-child(4) { transition-delay: 0.48s; }
+  body.b7 .checks.c1 div.last { opacity: 1; transform: none; transition-delay: 0s; }
+  body.b8 #f1 { opacity: 0; }
+
+  body.b8 #f2 { opacity: 1; }
+  body.b9 .p1, body.b10 .p2, body.b11 .p3, body.b12 .p4, body.b13 .p5, body.b14 .p6 { opacity: 1; transform: none; }
+  body.b10 .mini:nth-of-type(2) { transition-delay: 0.15s; } body.b10 .mini:nth-of-type(3) { transition-delay: 0.3s; }
+  body.b15 #f2 { opacity: 0; }
+
+  body.b15 #f3 { opacity: 1; }
+  body.b16 .s1, body.b17 .s2, body.b18 .s3, body.b19 .s4, body.b20 .s5, body.b21 .s6 { opacity: 1; transform: none; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <symbol id="robot" viewBox="0 0 48 48"><path class="ico" d="M24 6v6M14 12h20a6 6 0 0 1 6 6v12a6 6 0 0 1-6 6H14a6 6 0 0 1-6-6V18a6 6 0 0 1 6-6zM4 22v6M44 22v6M17 41h14"/><circle cx="18" cy="24" r="2.6" fill="currentColor"/><circle cx="30" cy="24" r="2.6" fill="currentColor"/><circle cx="24" cy="5" r="2" fill="currentColor"/></symbol>
+    <symbol id="person" viewBox="0 0 48 48"><circle class="ico" cx="24" cy="16" r="8"/><path class="ico" d="M8 42c2-10 9-14 16-14s14 4 16 14"/></symbol>
+    <symbol id="ship" viewBox="0 0 96 60"><path class="ico" d="M8 38h80l-9 14H18zM22 38V28h52v10M32 28V18h30v10M47 18V8M4 56c6-4 10 4 16 0s10 4 16 0 10 4 16 0 10 4 16 0 10 4 16 0 8 3 10 1"/><path class="ico" d="M30 33h4M40 33h4M50 33h4M60 33h4"/></symbol>
+    <symbol id="shield" viewBox="0 0 48 48"><path class="ico" d="M24 4l16 6v12c0 11-7 18-16 22C15 40 8 33 8 22V10z"/><path class="ico" d="M20 26l-2 2a4 4 0 0 0 6 6l2-2M28 22l2-2a4 4 0 0 0-6-6l-2 2M20 28l8-8"/></symbol>
+    <symbol id="search" viewBox="0 0 48 48"><circle class="ico" cx="21" cy="21" r="12"/><path class="ico" d="M30 30l11 11"/></symbol>
+    <symbol id="card" viewBox="0 0 48 48"><rect class="ico" x="5" y="11" width="38" height="26" rx="5"/><path class="ico" d="M5 20h38M12 30h10"/></symbol>
+    <symbol id="grid" viewBox="0 0 48 48"><rect class="ico" x="6" y="8" width="36" height="32" rx="4"/><path class="ico" d="M6 18h36M6 28h36M18 8v32M30 8v32"/></symbol>
+    <symbol id="doc" viewBox="0 0 48 48"><path class="ico" d="M12 6h18l8 8v28H12zM30 6v8h8M18 24h12M18 32h12"/></symbol>
+  </defs>
+</svg>
+
+<!-- ============ 0:00–0:10  the problem: everything is green, and it is wrong ============ -->
+<section class="frame" id="f1">
+  <h1>AI can follow every rule —<br>and still do the wrong thing.</h1>
+
+  <div class="bubble pop a1" style="left:158px; top:250px">Tokyo client meeting.</div>
+  <div class="actor human pop a1" style="left:34px; top:308px"><div class="face"><svg width="72" height="72"><use href="#person"/></svg></div><b>You</b><span>the business owner</span></div>
+  <div class="arrow pop a2" style="left:226px; top:340px">→</div>
+  <div class="actor pop a2" style="left:254px; top:308px"><div class="face"><svg width="76" height="76"><use href="#robot"/></svg></div><b>Travel Agent</b><span>“Arrange the business trip”</span></div>
+  <div class="arrow pop a3" style="left:448px; top:340px">→</div>
+  <div class="actor pop a3" style="left:476px; top:308px"><div class="face"><svg width="76" height="76"><use href="#robot"/></svg></div><b>Experience Agent</b><span>“Improve the travel experience”</span></div>
+  <div class="arrow pop a4" style="left:672px; top:340px">→</div>
+
+  <div class="buy pop a4" style="left:712px; top:250px; width:286px">
+    <div class="pic"><svg width="170" height="106"><use href="#ship"/></svg></div>
+    <div class="txt">Sunset dinner cruise<small>$95</small></div>
+    <div class="paid">PAID</div>
+  </div>
+  <div class="checks c1" style="left:1018px; top:250px; width:208px">
+    <div>Policy <span class="dot">✓</span></div>
+    <div>Budget <span class="dot">✓</span></div>
+    <div>Authority <span class="dot">✓</span></div>
+    <div>Scope <span class="dot">✓</span></div>
+    <div class="last">Intent <span class="dot q">?</span></div>
+  </div>
+  <div class="ask pop a6">Was this what you asked for?</div>
+</section>
+
+<!-- ============ 0:10–0:20  the answer: the same cast, with a firewall in the middle ============ -->
+<section class="frame" id="f2">
+  <h1>Let AI spend. <span class="hi">Keep your<br>business in control.</span></h1>
+
+  <div class="policy pop p1">
+    <h3><svg width="24" height="24"><use href="#doc"/></svg>Company policy — set by the owner</h3>
+    <p><i>$</i>Trip ≤ $800</p>
+    <p><i>$</i>Hotel ≤ $500</p>
+    <p><i>⚡</i>Auto-pay ≤ $150</p>
+    <p class="no"><i>✕</i>No entertainment</p>
+  </div>
+
+  <div class="pop p2">
+    <div class="mini" style="top:256px"><div class="face"><svg width="30" height="30"><use href="#robot"/></svg></div>Travel</div>
+    <div class="mini" style="top:366px"><div class="face"><svg width="30" height="30"><use href="#robot"/></svg></div>Booking</div>
+    <div class="mini" style="top:476px"><div class="face"><svg width="30" height="30"><use href="#robot"/></svg></div>Experience</div>
+  </div>
+  <div class="arrow pop p3" style="left:606px; top:372px">→</div>
+  <div class="shield pop p3"><svg width="76" height="76" style="margin:0 auto"><use href="#shield"/></svg><b>IntentChain</b><span>checks every hand-off</span></div>
+  <div class="arrow pop p3" style="left:832px; top:372px">→</div>
+
+  <div class="out ok pop p4" style="top:232px">
+    <div class="what">$18 eSIM</div><span class="pill">✓ AUTO-PAY</span><span class="to">→ PayPal</span>
+  </div>
+  <div class="out wait pop p5" style="top:366px">
+    <div class="what">$486 Hotel</div><span class="pill">MANAGER APPROVAL</span><span class="to">→ PayPal</span>
+  </div>
+  <div class="out no pop p6" style="top:500px">
+    <div class="what">$95 Dinner cruise</div><span class="pill">✕ BLOCKED</span>
+    <div class="why"><span class="five" style="color:#2fd08f">✓✓✓✓</span><span class="five">✕</span> &nbsp;passes every rule — fails intent</div>
+  </div>
+</section>
+
+<!-- ============ 0:20–0:30  how it is built: five stops on one line ============ -->
+<section class="frame" id="f3">
+  <h1>Trust the chain,<br><span class="hi">not just the agent.</span></h1>
+  <div class="name pop s1"><b>IntentChain Business Agent</b> — travel &amp; procurement for small businesses</div>
+  <div class="rail">
+    <div class="stop pop s1"><div class="verb">FIND</div><div class="face"><svg width="46" height="46"><use href="#search"/></svg></div><b>Channel3</b><span>real products from real retailers</span></div>
+    <div class="stop pop s2"><div class="verb">DECIDE</div><div class="face"><svg width="50" height="50"><use href="#robot"/></svg></div><b>Claude agents</b><span>plan, and delegate to each other</span></div>
+    <div class="stop core pop s3"><div class="verb">CHECK</div><div class="face"><svg width="50" height="50"><use href="#shield"/></svg></div><b>IntentChain</b><span>five checks at every hand-off</span></div>
+    <div class="stop pop s4"><div class="verb">PAY</div><div class="face"><svg width="48" height="48"><use href="#card"/></svg></div><b>PayPal</b><span>auto-pay, approval, refund</span></div>
+    <div class="stop pop s5"><div class="verb">RECORD</div><div class="face"><svg width="46" height="46"><use href="#grid"/></svg></div><b>AG Grid</b><span>every decision in the company ledger</span></div>
+  </div>
+  <div class="loop pop s6">The <b>owner</b> sets the policy at the start — and reads the ledger at the end.</div>
+</section>
+
+<script>
+  // Beat times in seconds. ?t=<seconds> jumps straight to a moment (for stills).
+  const BEATS = [0.1, 1.4, 2.7, 3.9, 5.1, 6.4, 8.2,          // frame 1
+                 10.0, 10.7, 12.0, 13.2, 14.4, 15.7, 17.0,     // frame 2
+                 20.0, 20.5, 21.9, 23.3, 24.9, 26.1, 27.6];    // frame 3
+  const jump = Number(new URLSearchParams(location.search).get('t'));
+  BEATS.forEach((at, i) => {
+    const on = () => document.body.classList.add(`b${i + 1}`);
+    if (jump) { if (at <= jump) on(); } else setTimeout(on, at * 1000);
+  });
+</script>
+</body>
+</html>
