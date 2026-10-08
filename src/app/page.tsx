@@ -101,6 +101,11 @@ export default function Home() {
           <span className={`badge ${state.config.ai_mode === 'live' ? 'live' : 'sim'}`}>
             Intent AI: <b>{state.config.ai_mode === 'live' ? 'Live' : 'Cached reference scores'}</b>
           </span>
+          {state.config.product_search && (
+            <span className="badge live">
+              Products: <b>Channel3 live search</b>
+            </span>
+          )}
           {state.config.agent_model && (
             <span className="badge live">
               Agent LLM: <b>{state.config.agent_model}</b>

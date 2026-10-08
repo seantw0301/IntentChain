@@ -90,6 +90,11 @@ The story ends with a short **office purchase** under the same policy: USB-C ada
 hires are auto-paid, a gaming graphics card is blocked. The roles are the same three, renamed —
 Procurement, Sourcing and Purchasing.
 
+With a [Channel3](https://trychannel3.com) key configured, the office purchase is sourced from
+**real retailers**: the Sourcing Agent runs a live product search, records which match it chose and
+why, and the Purchasing Agent pays for that product. (The PayPal payment is a sandbox payment; no
+order is placed with the retailer.) An LLM agent's `search_options` tool uses the same live search.
+
 Every proposed purchase lands in the **company ledger**, an [AG Grid](https://www.ag-grid.com)
 table with the firewall's verdict on each of the five checks, sortable and filterable per column,
 searchable, and exportable to CSV for the bookkeeper.
@@ -192,6 +197,7 @@ what you put in it:
 | `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET` | Real PayPal **sandbox** orders, captures and refunds |
 | `PAYPAL_AUTOPAY_AGREEMENT_ID` | Real **auto-pay**: the id of a sandbox billing agreement a buyer approved for your app. Without it, small purchases fall back to checkout |
 | `JEV_API_KEY` | **Live** AI intent analysis |
+| `CHANNEL3_API_KEY` | **Live product search** for office purchases, in place of the demo catalogue |
 | `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL` | Agents that **plan for themselves** with a tool-calling LLM (OpenAI-compatible endpoint) |
 
 To connect auto-pay to your own sandbox app, run `node scripts/connect-autopay.mjs`: it creates
@@ -256,6 +262,7 @@ src/lib/
   payments.ts       order, capture, refund, outcome, recovery, reconciliation, webhooks
   gateway.ts        agent gateway: grant tokens and guarded PayPal tools
   llm-agent.ts      agents that plan for themselves with a tool-calling LLM
+  channel3.ts       live product search
   jev.ts            AI client
   audit.ts          event log and dashboard metrics
   db.ts             SQLite storage, keyed by browser session
@@ -271,6 +278,7 @@ More detail: [docs/architecture.md](docs/architecture.md).
 - **PayPal Agent Toolkit** and the PayPal sandbox — orders, captures, refunds, reconciliation
 - **PayPal billing agreements** — auto-pay without a buyer present
 - **PayPal Webhooks** — signature-verified payment events
+- **Channel3** — live product search across retailers for office purchases
 - **AG Grid** (Community) — the company ledger: per-column sort and filter, quick search, pinned totals row, CSV export
 - **Claude** (Anthropic SDK) — the example bring-your-own agent
 - **JEV (TypeSafe System One)** — intent extraction and alignment scoring

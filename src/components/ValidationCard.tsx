@@ -123,6 +123,23 @@ export function ValidationCard({
         <div className="price">${tx.item.amount}</div>
       </div>
 
+      {tx.item.source === 'channel3' && (
+        <div className="product">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          {tx.item.image && <img src={tx.item.image} alt="" loading="lazy" />}
+          <span>
+            Real product, found with <b>Channel3</b> live search · sold by {tx.item.merchant}
+            {tx.item.url && (
+              <>
+                {' · '}
+                <a href={tx.item.url} target="_blank" rel="noreferrer noopener">view at the retailer</a>
+              </>
+            )}
+            <span className="hint"> · In this demo the PayPal payment is a sandbox payment, not an order placed with the retailer.</span>
+          </span>
+        </div>
+      )}
+
       <div className="checks">
         {v.policy && <RuleCheck name="Policy" check={v.policy} />}
         <RuleCheck name="Budget" check={v.budget} />
@@ -235,7 +252,7 @@ export function ValidationCard({
         <div className="scrim" onClick={() => setWhy(false)}>
           <div className="modal" role="dialog" aria-label="Decision provenance" onClick={(e) => e.stopPropagation()}>
             <h3>Why this payment?</h3>
-            <p className="sub">Decision provenance recorded by the Hotel Agent before any money moved.</p>
+            <p className="sub">Decision provenance, recorded before any money moved.</p>
             {decision.options.map((o) => (
               <div key={o.item.id} className={`opt ${o.outcome === 'SELECTED' ? 'sel' : 'rej'}`}>
                 <b>{o.item.name} — ${o.item.amount}</b>

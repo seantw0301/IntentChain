@@ -159,11 +159,11 @@ const SCENES = [
     do: async (p) => {
       await p.evaluate(() => window.scrollTo({ top: 0, behavior: 'smooth' }));
       await sleep(800);
-      await guide(p, 3500); // reset, then submit the office request
-      await guide(p, 2500); // confirm & delegate
-      await guide(p, 3000); // adapters → auto-pay
+      await guide(p, 2500); // reset, then submit the office request
+      await guide(p, 1800); // confirm & delegate
+      await guide(p, 2500); // adapters → auto-pay
       await view(p, '.checks');
-      await guide(p, 2500); // graphics card → blocked
+      await guide(p, 1800); // graphics card → blocked
       await view(p, '.checks');
     },
   },

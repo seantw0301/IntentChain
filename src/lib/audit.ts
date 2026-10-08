@@ -1,4 +1,5 @@
 import { db, list, newId } from './db';
+import { channel3Enabled } from './channel3';
 import { aiMode } from './jev';
 import { llmModel } from './llm';
 import { autopayAgreement, paypalMode } from './paypal';
@@ -106,6 +107,7 @@ export function snapshot(session: string): AppState {
       paypal_mode: paypalMode(),
       ai_mode: aiMode(),
       agent_model: llmModel(),
+      product_search: channel3Enabled(),
       demo_mode: process.env.DEMO_MODE !== 'false',
     },
   };

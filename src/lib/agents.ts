@@ -1,5 +1,6 @@
 import { emit } from './audit';
 import { CATEGORIES, HOTEL_OPTIONS, ITEMS } from './catalog';
+import { searchProducts } from './channel3';
 import { get, newId, put } from './db';
 import { delegateExperience, delegationFor } from './delegation';
 import { activeIntent } from './intent';
@@ -84,7 +85,7 @@ async function selectHotel(session: string, intent: Intent): Promise<Decision> {
     };
   });
   // keep a single winner: the closest acceptable option
-  const winners = options.filter((o) => o.outcome === 'SELECTED').sort((a, b) => a.minutes_to_meeting - b.minutes_to_meeting);
+  const winners = options.filter((o) => o.outcome === 'SELECTED').sort((a, b) => (a.minutes_to_meeting ?? 0) - (b.minutes_to_meeting ?? 0));
   if (!winners.length) throw new ApiError(409, 'NO_HOTEL', 'No hotel satisfies the delegated limits.');
   for (const o of winners.slice(1)) {
     o.outcome = 'REJECTED';
@@ -147,6 +148,40 @@ async function selectHotel(session: string, intent: Intent): Promise<Decision> {
   return decision;
 }
 
+/**
+ * Sourcing Agent: find real products for an office purchase through live
+ * product search, and record which was chosen and why. Returns null when live
+ * search is off or finds nothing, so the caller can use the demo catalogue.
+ */
+async function sourceProduct(session: string, intent: Intent, query: string): Promise<Decision | null> {
+  const limit = delegationFor(session, 'booking')?.budget ?? intent.budget;
+  const found = (await searchProducts(session, query, { category: 'office', location: intent.location, maxPrice: limit, limit: 5 })).slice(0, 3);
+  if (!found.length) return null;
+  const cheapest = [...found].sort((a, b) => a.amount - b.amount)[0];
+  const options: DecisionOption[] = found.map((item) => ({
+    item,
+    outcome: item.id === cheapest.id ? 'SELECTED' : 'REJECTED',
+    reason: item.id === cheapest.id ? `Lowest price among the matches, from ${item.merchant}` : `$${(item.amount - cheapest.amount).toFixed(2)} more than the selected option`,
+  }));
+  const decision: Decision = {
+    id: newId('dec'),
+    intent_id: intent.id,
+    agent: 'hotel',
+    question: `Which “${query}” should the team get?`,
+    options,
+    selected_item_id: cheapest.id,
+    because: [`matches the request: ${query}`, `within the Purchasing Agent's $${limit} limit`, 'lowest price among the live results', 'sourced from live retailer data through Channel3'],
+    source: 'cached',
+    created_at: new Date().toISOString(),
+  };
+  put('decisions', session, decision);
+  emit(session, 'decision.recorded', 'hotel-agent', { intent_id: intent.id }, {
+    selected: cheapest.name,
+    rejected: options.filter((o) => o.outcome === 'REJECTED').map((o) => `${o.item.name}: ${o.reason}`),
+  });
+  return decision;
+}
+
 export async function runStep(session: string, step: string): Promise<Transaction> {
   const intent = activeIntent(session);
   const s = SCENARIO[step];
@@ -154,6 +189,13 @@ export async function runStep(session: string, step: string): Promise<Transactio
   if (step === 'hotel') {
     const decision = await selectHotel(session, intent);
     return propose(session, intent, 'booking', ITEMS[decision.selected_item_id], decision.id);
+  }
+  if (step === 'usb-adapter') {
+    const decision = await sourceProduct(session, intent, 'USB-C multiport adapter');
+    if (decision) {
+      const chosen = decision.options.find((o) => o.item.id === decision.selected_item_id) as DecisionOption;
+      return propose(session, intent, 'booking', chosen.item, decision.id);
+    }
   }
   // the dinner cruise comes from the Experience Agent, at the end of a drifting chain
   if (s.agent === 'experience') await delegateExperience(session, intent);

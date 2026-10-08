@@ -348,3 +348,8 @@ input.inline { width: 78px; padding: 4px 8px; margin: 0 2px; }
 .transcript li.result.block { color: #ffb3ba; font-weight: 600; }
 .transcript li.result.pass { color: #b9f0d8; font-weight: 600; }
 .transcript li.result.warn { color: #f8d79a; font-weight: 600; }
+
+/* live product from Channel3 */
+.product { display: flex; gap: 12px; align-items: center; margin-bottom: 12px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel-2); font-size: 13px; }
+.product img { width: 56px; height: 56px; object-fit: contain; border-radius: 8px; background: #fff; flex: 0 0 auto; }
+.product a { color: var(--accent); }

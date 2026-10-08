@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import { propose } from './agents';
 import { CATEGORIES, ITEMS } from './catalog';
+import { channel3Item } from './channel3';
 import { get, newId, sessionOfDelegation } from './db';
 import { verifyChain } from './delegation';
 import { capturePayment, createPayment } from './payments';
@@ -153,13 +154,13 @@ export async function callTool(grant: Grant, name: string, input: Record<string,
     const item_name = String(input.item_name ?? '').trim().slice(0, 80);
     const amount = Number(input.amount_usd);
     const category = String(input.category ?? 'other') as Category;
-    const picked = typeof input.option_id === 'string' && Boolean(ITEMS[input.option_id]);
+    const picked = typeof input.option_id === 'string' && Boolean(ITEMS[input.option_id] ?? channel3Item(input.option_id));
     if (!picked && !item_name) throw new ApiError(400, 'INVALID_INPUT', 'item_name is required.');
     if (!picked && (!Number.isFinite(amount) || amount <= 0 || amount > 100000)) throw new ApiError(400, 'INVALID_INPUT', 'amount_usd must be between 0 and 100,000.');
     if (!picked && !CATEGORIES.includes(category)) throw new ApiError(400, 'INVALID_INPUT', `category must be one of: ${CATEGORIES.join(', ')}.`);
     const nights = Number.isInteger(input.nights) && (input.nights as number) > 0 ? (input.nights as number) : undefined;
     // a catalogue option keeps its identity; anything else is taken as described
-    const known = typeof input.option_id === 'string' ? ITEMS[input.option_id] : undefined;
+    const known = typeof input.option_id === 'string' ? (ITEMS[input.option_id] ?? channel3Item(input.option_id) ?? undefined) : undefined;
     const item: CatalogItem = known ?? {
       id: newId('ext'),
       name: item_name,

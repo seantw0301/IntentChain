@@ -1,5 +1,6 @@
 import { emit } from './audit';
 import { ITEMS } from './catalog';
+import { channel3Enabled, searchProducts } from './channel3';
 import { reserveAiCall } from './db';
 import { delegationFor } from './delegation';
 import { callTool, toolsForGrant, type Grant } from './gateway';
@@ -33,16 +34,21 @@ const SEARCH: ToolSpec = {
         enum: ['lodging', 'connectivity', 'transport', 'meals', 'office', 'entertainment'],
         description: 'The kind of thing to look for.',
       },
+      query: { type: 'string', description: 'What to look for, in a few words, e.g. "USB-C multiport adapter".' },
     },
     required: ['category'],
     additionalProperties: false,
   },
 };
 
-function search(category: Category, location: string) {
-  return Object.values(ITEMS)
-    .filter((i) => i.category === category && i.location === location)
-    .map((i) => ({ option_id: i.id, name: i.name, merchant: i.merchant, description: i.description, price_usd: i.amount }));
+/** Physical goods come from live product search when it is configured; everything else from the demo catalogue. */
+async function search(session: string, category: Category, query: string, location: string, maxPrice: number) {
+  const live =
+    category === 'office' && channel3Enabled() && query
+      ? await searchProducts(session, query, { category, location, maxPrice, limit: 5 })
+      : [];
+  const items = live.length ? live : Object.values(ITEMS).filter((i) => i.category === category && i.location === location);
+  return items.map((i) => ({ option_id: i.id, name: i.name, merchant: i.merchant, description: i.description, price_usd: i.amount }));
 }
 
 const MAX_TURNS = 6;
@@ -99,7 +105,7 @@ export async function runAgent(session: string, role: AgentRole, instruction: un
       let tone: AgentStep['tone'];
       try {
         if (call.function.name === 'search_options') {
-          const found = search(String(input.category) as Category, intent.location);
+          const found = await search(session, String(input.category) as Category, String(input.query ?? ''), intent.location, delegation.budget);
           output = { options: found };
           summary = found.length ? found.map((o) => `${o.name} $${o.price_usd}`).join(' · ') : 'no options';
         } else {

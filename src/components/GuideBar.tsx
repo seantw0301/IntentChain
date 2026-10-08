@@ -50,12 +50,14 @@ function nextStep(state: AppState, call: Call): { n: number; step: Step } {
         },
       };
     }
-    if (!tx('usb-adapter')) {
+    if (!tx('usb-adapter') && !transactions.some((t) => t.item.category === 'office')) {
       return {
         n: 2,
         step: {
           title: 'Adapters for the new hires',
-          notice: `$49, an allowed category, and exactly what was asked for — auto-paid under the $${policy.auto_pay_limit} limit.`,
+          notice: state.config.product_search
+            ? `The Sourcing Agent searches real retailers through Channel3, picks the best match, and the Purchasing Agent pays — auto-paid under the $${policy.auto_pay_limit} limit.`
+            : `$49, an allowed category, and exactly what was asked for — auto-paid under the $${policy.auto_pay_limit} limit.`,
           button: 'Order the adapters',
           run: evaluate('usb-adapter'),
         },

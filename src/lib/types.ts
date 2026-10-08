@@ -113,6 +113,10 @@ export interface CatalogItem {
   nights?: number;
   /** reference alignment score for a business trip (used when the AI is offline) */
   reference_score?: number;
+  /** set on products found through live search */
+  source?: 'channel3';
+  url?: string;
+  image?: string;
 }
 
 export interface Check {
@@ -195,8 +199,9 @@ export interface Transaction {
 
 export interface DecisionOption {
   item: CatalogItem;
-  minutes_to_meeting: number;
-  refundable: boolean;
+  /** hotels only */
+  minutes_to_meeting?: number;
+  refundable?: boolean;
   outcome: 'SELECTED' | 'REJECTED';
   reason: string;
 }
@@ -264,6 +269,8 @@ export interface AppState {
     ai_mode: 'live' | 'cached';
     /** the model behind agents that plan for themselves, when one is configured */
     agent_model: string | null;
+    /** true when office purchases are sourced through live Channel3 product search */
+    product_search: boolean;
     demo_mode: boolean;
   };
 }

@@ -49,7 +49,12 @@ export function ActivityPanel({
   const storySteps = office ? OFFICE_STEPS : STEPS;
   const bought = new Set(state.transactions.map((t) => t.item.id));
   const delegated = new Set(state.delegations.map((d) => d.agent as string));
-  const isDone = (s: Step) => (s.item ? bought.has(s.item) : delegated.has(s.delegate as string));
+  const isDone = (s: Step) =>
+    s.item === 'usb-adapter'
+      ? state.transactions.some((t) => t.item.category === 'office')
+      : s.item
+        ? bought.has(s.item)
+        : delegated.has(s.delegate as string);
   const next = storySteps.find((s) => !isDone(s))?.key;
   // an approved transaction should be paid before the story moves on
   const unpaid = state.transactions.some((t) => t.status === 'APPROVED' || t.status === 'ORDER_CREATED');
