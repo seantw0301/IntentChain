@@ -26,8 +26,10 @@ const RATE = process.env.RATE || '172';
 const HEADED = process.env.HEADED === '1';
 const VIEW = { width: 1120, height: 630 }; // small viewport, recorded at 1080p, so text stays readable
 
-fs.rmSync(OUT, { recursive: true, force: true });
+// keep earlier takes; only clear this run's scratch files
+fs.rmSync(path.join(OUT, 'audio'), { recursive: true, force: true });
 fs.mkdirSync(path.join(OUT, 'audio'), { recursive: true });
+for (const f of fs.readdirSync(OUT)) if (f.endsWith('.webm')) fs.rmSync(path.join(OUT, f));
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const run = (cmd, args) => execFileSync(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'] }).toString();
@@ -241,6 +243,7 @@ console.log(`Narration total: ${clips.reduce((a, c) => a + c.seconds, 0).toFixed
 const browser = await chromium.launch({ headless: !HEADED });
 const context = await browser.newContext({
   viewport: VIEW,
+  locale: 'en-US', // so third-party pages such as PayPal render in English
   recordVideo: { dir: OUT, size: { width: 1920, height: 1080 } },
 });
 const page = await context.newPage();
@@ -284,7 +287,7 @@ const audio =
   marks.map((m, i) => `[${i + 1}:a]adelay=${Math.round((m.start - cutBefore(m.start)) * 1000)}:all=1[a${i}]`).join(';') +
   `;${marks.map((_, i) => `[a${i}]`).join('')}amix=inputs=${marks.length}:normalize=0[a]`;
 
-const final = path.join(OUT, 'intentchain-demo.mp4');
+const final = path.join(OUT, process.env.OUTPUT || 'intentchain-demo.mp4');
 run('ffmpeg', [
   '-y', ...inputs,
   '-filter_complex', `${video};${audio}`,
