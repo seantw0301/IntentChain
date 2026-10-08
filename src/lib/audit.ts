@@ -1,6 +1,7 @@
 import { db, list, newId } from './db';
 import { aiMode } from './jev';
-import { paypalMode } from './paypal';
+import { autopayAgreement, paypalMode } from './paypal';
+import { getPolicy } from './policy';
 import type {
   AppState,
   AuditEvent,
@@ -84,6 +85,12 @@ export function snapshot(session: string): AppState {
   return {
     intent,
     delegations,
+    policy: getPolicy(session),
+    autopay: {
+      connected: paypalMode() === 'mock' || Boolean(autopayAgreement()),
+      mode: paypalMode(),
+      agreement_id: autopayAgreement(),
+    },
     grant_tokens: Object.fromEntries(
       delegations
         .filter((d) => d.signature && d.paypal_tools.length)

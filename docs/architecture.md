@@ -29,22 +29,29 @@ flowchart TD
   N --> O[Recovery proposal awaits a human]
 ```
 
-## The four checks
+## The five checks
 
-They are deliberately non-overlapping, and all four are shown for every transaction.
+They are deliberately non-overlapping, and all five are shown for every transaction.
 
 | Check | Rule |
 |---|---|
-| Budget | captured-and-not-refunded total + this amount ≤ intent budget. Blocked transactions consume nothing |
-| Authority | amount ≤ the tightest limit anywhere up the agent's delegation chain, including any category cap and per-night cap; the grant must be active and unexpired |
+| Policy | the purchase category must be on the company's allowed list and not on its blocked list |
+| Budget | captured-and-not-refunded total + this amount ≤ the request's budget. Blocked transactions consume nothing |
+| Authority | amount ≤ the tightest limit anywhere up the agent's delegation chain, including any category cap and per-night cap; the chain's signatures must verify; the grant must be active and unexpired |
 | Scope | where and when only: trip location, trip dates, currency. Never *what* is bought |
-| Intent | a purchase in a restricted category fails outright; otherwise the alignment score decides (≥ 65 pass, 40–64 human review, < 40 fail) |
+| Intent | AI alignment score against the original request (≥ 65 pass, 40–64 human review, < 40 fail). A purchase that arrives through a drifted hand-off gets no benefit of the doubt: review becomes fail |
 
-Keeping "what is bought" out of Scope is what lets the Intent check stand alone: the theme park
-ticket is in the right city, on the right dates, within the Travel Agent's $600 authority and within
-budget. Only its purpose is wrong.
+Policy answers "is this kind of thing allowed here?". Intent answers "is this what was asked
+for?". They are different findings, so Intent is evaluated even when Policy fails. The dinner
+cruise in the demo passes Policy, Budget, Authority and Scope; only Intent, together with the
+drift recorded on its delegation chain, stops it.
 
-When a rule check fails the AI is not called at all.
+A purchase that passes all five is routed by amount: at or under the owner's auto-pay limit it is
+captured immediately against the company's PayPal billing agreement; over it, the transaction
+waits for a manager to approve the PayPal order.
+
+The request itself must fit inside the company policy (a trip budget above the company limit is
+refused), so the policy is the root of the same subset rule that governs every delegation.
 
 ## Delegation
 

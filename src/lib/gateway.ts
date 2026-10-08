@@ -55,7 +55,8 @@ const DEFINITIONS: Record<string, ToolDefinition> = {
     name: 'create_order',
     description:
       'Propose a purchase and, if the IntentChain firewall approves it, create a PayPal order for it. ' +
-      'The firewall checks budget, authority, scope and whether the purchase serves the human intent. ' +
+      'The firewall checks company policy, budget, authority, scope and whether the purchase serves the human intent. ' +
+      'Small approved purchases are auto-paid; larger ones need a manager to approve in PayPal. ' +
       'A blocked purchase returns blocked=true with the reason; do not retry it with different wording.',
     input_schema: {
       type: 'object',
@@ -110,7 +111,9 @@ function summarize(tx: Transaction) {
     decision: v.decision,
     reason_code: v.reason_code,
     explanation: v.headline,
+    payment_route: v.payment_route ?? null,
     checks: {
+      policy: v.policy.pass ? 'pass' : `fail: ${v.policy.detail}`,
       budget: v.budget.pass ? 'pass' : `fail: ${v.budget.detail}`,
       authority: v.authority.pass ? 'pass' : `fail: ${v.authority.detail}`,
       scope: v.scope.pass ? 'pass' : `fail: ${v.scope.detail}`,
@@ -128,7 +131,9 @@ function summarize(tx: Transaction) {
       : null,
     next_step:
       tx.status === 'ORDER_CREATED'
-        ? 'A human buyer must approve the PayPal order (approve_url). Then call pay_order.'
+        ? 'This is above the auto-pay limit. A manager must approve it in PayPal (approve_url). Then call pay_order.'
+        : tx.status === 'CAPTURED'
+          ? 'Paid.'
         : tx.status === 'WARNING'
           ? 'A human must confirm this purchase in IntentChain before it can be paid.'
           : tx.status === 'BLOCKED'

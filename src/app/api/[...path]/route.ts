@@ -14,6 +14,7 @@ import { activeIntent, confirmIntent, createIntent } from '@/lib/intent';
 import { authenticate, callTool, toolsForGrant } from '@/lib/gateway';
 import { applyWebhook, capturePayment, createPayment, reconcile, reportOutcome } from '@/lib/payments';
 import { verifyWebhook } from '@/lib/paypal';
+import { updatePolicy } from '@/lib/policy';
 import { publicOrigin, sessionId } from '@/lib/session';
 import { ApiError } from '@/lib/types';
 
@@ -27,6 +28,13 @@ type Handler = (ctx: { session: string; body: Body; params: string[]; req: NextR
 const ROUTES: [string, string, Handler][] = [
   ['GET', 'audit', ({ session }) => snapshot(session)],
   ['GET', 'audit/:intent', ({ session }) => snapshot(session)],
+
+  // the owner's spending policy
+  ['GET', 'company/policy', ({ session }) => snapshot(session).policy],
+  ['PUT', 'company/policy', ({ session, body }) => {
+    updatePolicy(session, body);
+    return snapshot(session);
+  }],
 
   ['POST', 'intent', async ({ session, body }) => {
     await createIntent(session, String(body.prompt ?? ''));
@@ -186,7 +194,7 @@ async function handle(req: NextRequest, path: string[]): Promise<Response> {
       const params = match(pattern, path);
       if (!params) continue;
       const session = await sessionId();
-      const body: Body = req.method === 'POST' ? await jsonBody(req) : {};
+      const body: Body = req.method === 'POST' || req.method === 'PUT' ? await jsonBody(req) : {};
       const out = await handler({ session, body, params, req });
       return out instanceof Response ? out : NextResponse.json(out);
     }
@@ -207,5 +215,9 @@ export async function GET(req: NextRequest, ctx: Ctx) {
 }
 
 export async function POST(req: NextRequest, ctx: Ctx) {
+  return handle(req, (await ctx.params).path);
+}
+
+export async function PUT(req: NextRequest, ctx: Ctx) {
   return handle(req, (await ctx.params).path);
 }

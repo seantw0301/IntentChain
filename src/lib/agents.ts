@@ -4,6 +4,7 @@ import { get, newId, put } from './db';
 import { delegateExperience, delegationFor } from './delegation';
 import { activeIntent } from './intent';
 import { asChoice, ask } from './jev';
+import { autoSettle } from './payments';
 import { evaluate } from './validator';
 import { ApiError } from './types';
 import type { AgentRole, CatalogItem, Category, Decision, DecisionOption, Intent, Transaction } from './types';
@@ -15,7 +16,8 @@ import type { AgentRole, CatalogItem, Category, Decision, DecisionOption, Intent
 export const SCENARIO: Record<string, { agent: AgentRole; item: string; label: string }> = {
   esim: { agent: 'travel', item: 'esim', label: 'Travel Agent buys a Japan eSIM' },
   'luxury-hotel': { agent: 'booking', item: 'luxury-hotel', label: 'Booking Agent tries a luxury hotel' },
-  'theme-park': { agent: 'experience', item: 'theme-park', label: 'Experience Agent adds a theme park ticket' },
+  'theme-park': { agent: 'travel', item: 'theme-park', label: 'Travel Agent adds a theme park ticket' },
+  'dinner-cruise': { agent: 'experience', item: 'dinner-cruise', label: 'Experience Agent books a dinner cruise' },
   hotel: { agent: 'booking', item: 'hotel-b', label: 'Hotel Agent compares hotels, Booking Agent books' },
   'airport-transfer': { agent: 'travel', item: 'airport-transfer', label: 'Travel Agent adds an airport transfer' },
 };
@@ -55,8 +57,10 @@ export async function propose(
     reason: validation.reason_code,
     score: validation.intent.score,
     ai_source: validation.intent.source,
+    payment_route: validation.payment_route ?? null,
   });
-  return tx;
+  // under the owner's auto-pay limit: pay now, no human in the loop
+  return autoSettle(session, tx);
 }
 
 /** Hotel Agent: compare the candidates and record why one was chosen. */
@@ -148,7 +152,7 @@ export async function runStep(session: string, step: string): Promise<Transactio
     const decision = await selectHotel(session, intent);
     return propose(session, intent, 'booking', ITEMS[decision.selected_item_id], decision.id);
   }
-  // the theme park ticket comes from the Experience Agent, at the end of a drifting chain
+  // the dinner cruise comes from the Experience Agent, at the end of a drifting chain
   if (s.agent === 'experience') await delegateExperience(session, intent);
   return propose(session, intent, s.agent, ITEMS[s.item]);
 }
@@ -192,6 +196,8 @@ export function resolveWarning(session: string, id: string, approve: boolean): T
     ...tx.validation,
     decision: tx.status,
     reason_code: approve ? 'OK' : 'REJECTED_BY_HUMAN',
+    // a human has already stepped in, so the payment goes through manager approval
+    payment_route: approve ? 'MANAGER_APPROVAL' : undefined,
     headline: approve ? 'Confirmed by the human. Cleared for payment.' : 'Rejected by the human.',
   };
   tx.updated_at = new Date().toISOString();

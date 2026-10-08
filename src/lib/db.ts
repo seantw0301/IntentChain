@@ -13,6 +13,7 @@ export const TABLES = [
   'decisions',
   'transactions',
   'recoveries',
+  'policies',
 ] as const;
 export type Table = (typeof TABLES)[number];
 

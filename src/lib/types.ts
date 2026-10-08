@@ -2,9 +2,32 @@ export type Category =
   | 'lodging'
   | 'connectivity'
   | 'transport'
+  | 'meals'
+  | 'office'
   | 'entertainment'
   | 'subscription'
+  | 'gaming'
   | 'other';
+
+/** What the business owner allows its agents to do with company money. */
+export interface CompanyPolicy {
+  id: string;
+  company: string;
+  travel_budget: number;
+  hotel_limit: number;
+  /** purchases at or below this are paid without asking a manager */
+  auto_pay_limit: number;
+  allowed_categories: Category[];
+  blocked_categories: Category[];
+  created_at: string;
+}
+
+/** How auto-pay reaches PayPal: a billing agreement the owner approved once. */
+export interface AutoPay {
+  connected: boolean;
+  mode: 'sandbox' | 'mock';
+  agreement_id: string | null;
+}
 
 export type AgentRole = 'travel' | 'hotel' | 'booking' | 'experience' | 'custom' | 'recovery';
 
@@ -101,6 +124,8 @@ export interface IntentCheck {
 }
 
 export interface Validation {
+  /** company policy: is this kind of purchase allowed at all? */
+  policy: Check;
   budget: Check;
   authority: Check;
   scope: Check;
@@ -108,6 +133,8 @@ export interface Validation {
   decision: 'APPROVED' | 'WARNING' | 'BLOCKED';
   reason_code:
     | 'OK'
+    | 'POLICY_VIOLATION'
+    | 'INTENT_DRIFT'
     | 'AUTHORITY_EXCEEDED'
     | 'BUDGET_EXCEEDED'
     | 'OUT_OF_SCOPE'
@@ -119,6 +146,8 @@ export interface Validation {
   violation?: Violation;
   /** number of signed delegation hops verified for this transaction */
   chain_hops?: number;
+  /** for an approved purchase: paid automatically, or held for a manager */
+  payment_route?: 'AUTO_PAY' | 'MANAGER_APPROVAL';
 }
 
 export type TxStatus =
@@ -134,6 +163,8 @@ export type TxStatus =
 
 export interface Payment {
   mode: 'sandbox' | 'mock';
+  /** auto-pay through the billing agreement, or a checkout the manager approves in PayPal */
+  via?: 'billing_agreement' | 'checkout';
   order_id?: string;
   approve_url?: string | null;
   capture_id?: string;
@@ -219,6 +250,8 @@ export interface AppState {
   recoveries: Recovery[];
   events: AuditEvent[];
   metrics: Metrics | null;
+  policy: CompanyPolicy;
+  autopay: AutoPay;
   /** grant tokens for the agent gateway, by delegation id */
   grant_tokens: Record<string, string>;
   config: {

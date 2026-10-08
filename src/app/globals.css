@@ -166,7 +166,7 @@ details.custom summary { cursor: pointer; color: var(--muted); font-size: 13px; 
 .verdict .what h3 { margin: 0; font-size: 19px; }
 .verdict .what p { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
 .verdict .price { font-size: 28px; font-weight: 800; letter-spacing: -0.5px; }
-.checks { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.checks { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
 @media (max-width: 760px) { .checks { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .check { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; background: var(--panel-2); }
 .check .name { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); }
@@ -316,3 +316,12 @@ details.byo pre { margin: 8px 0; padding: 10px 12px; background: #0b1227; border
   .guide { grid-template-columns: minmax(0, 1fr); position: static; }
 }
 .grid:not(.two):not(.mid):not(.low) { grid-template-columns: minmax(0, 1fr); }
+
+/* company policy */
+.chip.toggle { cursor: pointer; font: inherit; font-size: 12px; color: var(--text); }
+.chip.toggle.yes { border-color: rgba(47, 208, 143, 0.45); color: #b9f0d8; }
+.chip.toggle:hover:not(:disabled) { border-color: var(--accent); }
+.chip.toggle:disabled { opacity: 0.6; cursor: not-allowed; }
+input.inline { width: 78px; padding: 4px 8px; margin: 0 2px; }
+.kv dd.row { gap: 4px; font-weight: 600; }
+.kv dd .hint { font-weight: 400; }

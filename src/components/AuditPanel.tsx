@@ -15,9 +15,14 @@ interface Row {
 function mark(t: Transaction): { cls: string; sym: string; text: string } {
   const sim = t.payment?.mode === 'mock' ? ' (simulated)' : '';
   switch (t.status) {
-    case 'CAPTURED': return { cls: 'ok', sym: '✓', text: `PayPal captured${sim}` };
-    case 'APPROVED': return { cls: 'wait', sym: '•', text: 'Authorized — awaiting payment' };
-    case 'ORDER_CREATED': return { cls: 'wait', sym: '•', text: 'PayPal order open — awaiting buyer' };
+    case 'CAPTURED':
+      return {
+        cls: 'ok',
+        sym: '✓',
+        text: t.payment?.via === 'billing_agreement' ? `Auto-paid via PayPal${sim}` : `Manager approved · PayPal captured${sim}`,
+      };
+    case 'APPROVED': return { cls: 'wait', sym: '•', text: 'Waiting for manager approval' };
+    case 'ORDER_CREATED': return { cls: 'wait', sym: '•', text: 'Waiting for manager approval in PayPal' };
     case 'WARNING': return { cls: 'wait', sym: '!', text: 'Needs human review' };
     case 'OUTCOME_FAILED': return { cls: 'no', sym: '✓', text: 'Captured · outcome failed' };
     case 'REFUNDED': return { cls: 'wait', sym: '✓', text: `Captured · outcome failed · refunded${sim}` };
@@ -28,7 +33,9 @@ function mark(t: Transaction): { cls: string; sym: string; text: string } {
 
 function reason(t: Transaction): string {
   switch (t.validation.reason_code) {
-    case 'AUTHORITY_EXCEEDED': return 'Authority exceeded';
+    case 'POLICY_VIOLATION': return 'Blocked — company policy';
+    case 'INTENT_DRIFT': return 'Blocked — intent drift, not what was asked for';
+    case 'AUTHORITY_EXCEEDED': return 'Blocked — delegated authority exceeded';
     case 'BUDGET_EXCEEDED': return 'Budget exceeded';
     case 'OUT_OF_SCOPE': return 'Out of scope';
     case 'INTENT_MISMATCH': return 'Intent mismatch';
@@ -57,7 +64,7 @@ export function AuditPanel({
 
   return (
     <section className="panel">
-      <h2><span className="step">5</span>IntentChain audit{intent ? ` — ${intent.goal}` : ''}</h2>
+      <h2><span className="step">6</span>Company activity{intent ? ` — ${intent.goal}` : ''}</h2>
       {!intent || !m ? (
         <p className="empty">No intent, no transactions, no audit.</p>
       ) : (

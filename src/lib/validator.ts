@@ -2,6 +2,7 @@ import { spent } from './audit';
 import { referenceReason, referenceScore } from './catalog';
 import { list } from './db';
 import { delegationFor, verifyChain } from './delegation';
+import { checkPolicy, getPolicy } from './policy';
 import { asChoice, asScore, ask } from './jev';
 import type {
   AgentRole,
@@ -103,9 +104,7 @@ const REASONS: Record<string, string> = {
   different_purpose: 'Serves leisure or a different purpose than the stated goal',
 };
 
-async function checkIntent(session: string, intent: Intent, item: CatalogItem): Promise<IntentCheck> {
-  const restriction = intent.restrictions.find((r) => r.category === item.category) ?? null;
-
+async function checkIntent(session: string, intent: Intent, item: CatalogItem, drifted: boolean): Promise<IntentCheck> {
   let score = referenceScore(intent, item);
   let reason = referenceReason(intent, item, score);
   let source: IntentCheck['source'] = 'cached';
@@ -117,7 +116,6 @@ async function checkIntent(session: string, intent: Intent, item: CatalogItem): 
         goal: intent.goal,
         purpose: intent.purpose_detail,
         trip_type: intent.purpose,
-        restrictions: intent.restrictions.map((r) => r.label),
       },
       proposed_purchase: {
         name: item.name,
@@ -158,16 +156,16 @@ async function checkIntent(session: string, intent: Intent, item: CatalogItem): 
     source = 'jev';
   }
 
-  if (restriction) {
-    return {
-      status: 'fail',
-      score,
-      detail: `Violates "${restriction.label}" · Alignment ${score}`,
-      restriction: restriction.label,
-      source,
-    };
+  // offline, an unknown item cannot be judged on its wording: one that arrives through a
+  // drifted hand-off is not given a passing reference score
+  if (source === 'cached' && drifted && item.reference_score === undefined && score >= PASS_AT) {
+    score = 50;
+    reason = 'Could not be verified without the AI, and it arrived through a drifted hand-off.';
   }
-  const status: IntentCheck['status'] = score >= PASS_AT ? 'pass' : score >= REVIEW_AT ? 'warning' : 'fail';
+
+  let status: IntentCheck['status'] = score >= PASS_AT ? 'pass' : score >= REVIEW_AT ? 'warning' : 'fail';
+  // a purchase that arrives through a drifted hand-off gets no benefit of the doubt
+  if (drifted && status === 'warning') status = 'fail';
   return { status, score, detail: `${reason} · Alignment ${score}`, restriction: null, source };
 }
 
@@ -181,9 +179,16 @@ const AGENT_NAMES: Record<AgentRole, string> = {
 };
 
 /**
- * The firewall between an agent and PayPal. The signed delegation chain is
- * verified first, then the rule checks run; the AI is only consulted when they
- * pass, and it can block or downgrade but never approve a payment on its own.
+ * The firewall between an agent and PayPal. Five independent checks:
+ *   Policy    — does the company allow this kind of purchase at all?
+ *   Budget    — is there money left for this request?
+ *   Authority — may this agent spend this much, over a chain that verifies?
+ *   Scope     — right place, right dates?
+ *   Intent    — does it serve what the employee was actually sent to do?
+ * The first four are rules. The AI is consulted for the fifth, and it can block
+ * or downgrade a payment but never approve one on its own. A purchase that
+ * passes all five is then routed: auto-pay under the owner's limit, manager
+ * approval above it.
  */
 export async function evaluate(
   session: string,
@@ -192,10 +197,13 @@ export async function evaluate(
   item: CatalogItem,
 ): Promise<{ validation: Validation; delegation: Delegation | null }> {
   const transactions = list<Transaction>('transactions', session);
+  const company = getPolicy(session);
   const delegation = delegationFor(session, agent);
   const verified = delegation ? verifyChain(session, intent, delegation) : null;
   const chain = verified?.ok ? verified.chain : [];
+  const drifted = chain.find((d) => d.drift);
 
+  const policy = checkPolicy(company, item);
   const budget = checkBudget(intent, item, spent(transactions));
   const authority: Check =
     verified && !verified.ok
@@ -210,20 +218,33 @@ export async function evaluate(
     restriction: null,
     source: null,
   };
+  // intent is judged whenever the purchase is structurally possible, even if policy forbids it:
+  // "not allowed here" and "not what was asked for" are different findings
   if (budget.pass && authority.pass && scope.pass) {
-    intentCheck = await checkIntent(session, intent, item);
+    intentCheck = await checkIntent(session, intent, item, Boolean(drifted));
   }
 
   // responsibility: which agent, or which hop of the chain, introduced the problem
   const who = AGENT_NAMES[agent];
   const blame = (type: string): Violation => ({ source: who, type, delegation_id: delegation?.id ?? null });
-  const drifted = chain.find((d) => d.drift);
+  const hop = drifted
+    ? {
+        source: `${drifted.from === 'human' ? 'Requester' : AGENT_NAMES[drifted.from]} → ${AGENT_NAMES[drifted.agent]} delegation`,
+        type: `Intent drift (fidelity ${drifted.fidelity?.score ?? '?'}%)`,
+        delegation_id: drifted.id,
+      }
+    : null;
 
   let decision: Validation['decision'] = 'APPROVED';
   let reason_code: Validation['reason_code'] = 'OK';
-  let headline = 'All four checks passed.';
+  let headline = 'All five checks passed.';
   let violation: Violation | undefined;
-  if (!authority.pass) {
+  if (!policy.pass) {
+    decision = 'BLOCKED';
+    reason_code = 'POLICY_VIOLATION';
+    headline = `Company policy. ${cap(policy.detail)}.`;
+    violation = blame('Company policy');
+  } else if (!authority.pass) {
     decision = 'BLOCKED';
     reason_code = 'AUTHORITY_EXCEEDED';
     headline = `Authority exceeded. ${authority.detail}.`;
@@ -240,30 +261,20 @@ export async function evaluate(
     violation = blame('Out of scope');
   } else if (intentCheck.status === 'fail') {
     decision = 'BLOCKED';
-    reason_code = 'INTENT_MISMATCH';
-    headline = `This purchase fits the budget, the authority and the scope — but not the original ${intent.purpose}-trip intent.`;
-    violation = drifted
-      ? {
-          source: `${drifted.from === 'human' ? 'Human' : AGENT_NAMES[drifted.from]} → ${AGENT_NAMES[drifted.agent]} delegation`,
-          type: `Intent drift (fidelity ${drifted.fidelity?.score ?? '?'}%)`,
-          delegation_id: drifted.id,
-        }
-      : blame('Intent mismatch');
+    reason_code = hop ? 'INTENT_DRIFT' : 'INTENT_MISMATCH';
+    headline = hop
+      ? 'Every policy check passed — allowed category, within budget, within authority — but this is not what the employee was sent to do.'
+      : `This purchase fits the budget, the authority and the scope — but not the original ${intent.purpose}-trip intent.`;
+    violation = hop ?? blame('Intent mismatch');
   } else if (intentCheck.status === 'warning') {
     decision = 'WARNING';
     reason_code = 'NEEDS_HUMAN_REVIEW';
-    headline = 'The link to the original intent is unclear. A human must confirm before payment.';
-    violation = drifted
-      ? {
-          source: `${drifted.from === 'human' ? 'Human' : AGENT_NAMES[drifted.from]} → ${AGENT_NAMES[drifted.agent]} delegation`,
-          type: `Intent drift (fidelity ${drifted.fidelity?.score ?? '?'}%)`,
-          delegation_id: drifted.id,
-        }
-      : undefined;
+    headline = 'The link to the original request is unclear. A human must confirm before payment.';
   }
 
   return {
     validation: {
+      policy,
       budget,
       authority,
       scope,
@@ -273,7 +284,13 @@ export async function evaluate(
       headline,
       violation,
       chain_hops: chain.length || undefined,
+      payment_route:
+        decision === 'APPROVED' ? (item.amount <= company.auto_pay_limit ? 'AUTO_PAY' : 'MANAGER_APPROVAL') : undefined,
     },
     delegation,
   };
+}
+
+function cap(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }

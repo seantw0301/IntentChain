@@ -2,6 +2,7 @@ import { emit } from './audit';
 import { get, list, put } from './db';
 import { buildChain } from './delegation';
 import { asChoice, ask } from './jev';
+import { getPolicy } from './policy';
 import { addDays } from './validator';
 import { ApiError } from './types';
 import type { Delegation, Intent, Restriction } from './types';
@@ -85,13 +86,9 @@ async function extractByAi(session: string, prompt: string, budget: number): Pro
   };
 }
 
-function restrictionsFor(e: Extracted, prompt: string): Restriction[] {
-  const out: Restriction[] = [];
-  if (e.purpose === 'business' || /no (unrelated )?entertainment/i.test(prompt)) {
-    out.push({ label: 'No entertainment', category: 'entertainment' });
-  }
-  out.push({ label: 'No subscriptions', category: 'subscription' });
-  return out;
+/** What the requester sees as limits: the company's blocked categories. */
+function restrictionsFrom(blocked: string[]): Restriction[] {
+  return blocked.map((c) => ({ label: `No ${c}`, category: c as Restriction['category'] }));
 }
 
 /** Tuesday of next week, so "next week" always resolves to a real date. */
@@ -116,7 +113,15 @@ export async function createIntent(session: string, prompt: string): Promise<Int
   }
   const fromAi = await extractByAi(session, text, byRules.budget);
   const extracted = fromAi ?? byRules;
-  if (extracted.budget > 100000) throw new ApiError(422, 'BUDGET_TOO_LARGE', 'The demo supports budgets up to $100,000.');
+  // the request must fit inside the company policy, the same way every grant must fit inside its parent
+  const policy = getPolicy(session);
+  if (extracted.budget > policy.travel_budget) {
+    throw new ApiError(
+      422,
+      'OVER_COMPANY_BUDGET',
+      `${policy.company} allows up to $${policy.travel_budget} per trip. This request asks for $${extracted.budget}.`,
+    );
+  }
 
   const nights = 3;
   const trip_start = nextWeekTuesday();
@@ -126,12 +131,12 @@ export async function createIntent(session: string, prompt: string): Promise<Int
     prompt: text,
     ...extracted,
     currency: 'USD',
-    // demo policy template: lodging may use up to 5/6 of the budget, connectivity up to $40
+    // lodging is capped by the company hotel limit and by 5/6 of this trip's budget; connectivity at $40
     category_caps: {
-      lodging: Math.round((extracted.budget * 5) / 6),
+      lodging: Math.min(policy.hotel_limit, Math.round((extracted.budget * 5) / 6)),
       connectivity: Math.min(40, extracted.budget),
     },
-    restrictions: restrictionsFor(extracted, text),
+    restrictions: restrictionsFrom(policy.blocked_categories),
     trip_start,
     trip_end: addDays(trip_start, nights),
     nights,

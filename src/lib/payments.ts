@@ -1,7 +1,7 @@
 import { emit, spent } from './audit';
 import { ITEMS, RECOVERY_OPTION } from './catalog';
 import { findByPayPalId, get, list, newId, put } from './db';
-import { captureOrder, createOrder, orderStatus, paypalMode, readOrder, readRefund, refundCapture } from './paypal';
+import { autoPay, autopayAgreement, captureOrder, createOrder, orderStatus, paypalMode, readOrder, readRefund, refundCapture } from './paypal';
 import { asNoul, ask } from './jev';
 import { evaluate } from './validator';
 import { ApiError } from './types';
@@ -72,6 +72,44 @@ export async function createPayment(session: string, id: string, origin: string)
     tx.payment = { mode: paypalMode(), error: (err as Error).message };
     save(session, tx);
     emit(session, 'payment.failed', `${tx.agent}-agent`, { intent_id: tx.intent_id, transaction_id: tx.id }, {
+      item: tx.item.name,
+      error: (err as Error).message,
+    });
+  }
+  return tx;
+}
+
+/**
+ * Auto-pay: a purchase that passed every check and is under the owner's limit
+ * is paid at once through the company's PayPal billing agreement.
+ */
+export async function autoSettle(session: string, tx: Transaction): Promise<Transaction> {
+  if (tx.status !== 'APPROVED' || tx.validation.payment_route !== 'AUTO_PAY') return tx;
+  // with PayPal live but no billing agreement on file, fall back to an ordinary checkout
+  if (paypalMode() === 'sandbox' && !autopayAgreement()) return tx;
+  try {
+    tx.payment = await autoPay({
+      role: tx.agent,
+      transactionId: tx.id,
+      name: tx.item.name,
+      description: tx.item.description,
+      amount: tx.item.amount,
+      lineage: `IntentChain ${tx.intent_id} / ${tx.agent}-agent / ${tx.id}`,
+    });
+    tx.status = 'CAPTURED';
+    save(session, tx);
+    emit(session, 'payment.captured', 'paypal', { intent_id: tx.intent_id, transaction_id: tx.id }, {
+      item: tx.item.name,
+      amount: tx.item.amount,
+      capture_id: tx.payment.capture_id,
+      mode: tx.payment.mode,
+      auto: true,
+    });
+  } catch (err) {
+    tx.status = 'PAYMENT_FAILED';
+    tx.payment = { mode: paypalMode(), via: 'billing_agreement', error: (err as Error).message };
+    save(session, tx);
+    emit(session, 'payment.failed', 'paypal', { intent_id: tx.intent_id, transaction_id: tx.id }, {
       item: tx.item.name,
       error: (err as Error).message,
     });

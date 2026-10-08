@@ -5,7 +5,7 @@ import type { AppState, Delegation } from '@/lib/types';
 import type { Call } from '@/app/page';
 
 export const AGENT_NAMES: Record<string, string> = {
-  human: 'You',
+  human: 'Requester',
   travel: 'Travel Agent',
   hotel: 'Hotel Agent',
   booking: 'Booking Agent',
@@ -88,14 +88,14 @@ export function ChainPanel({ state, call, busy }: { state: AppState; call: Call;
 
   return (
     <section className="panel">
-      <h2><span className="step">2</span>Delegation chain — authority can only shrink</h2>
+      <h2><span className="step">3</span>Delegation chain — authority can only shrink</h2>
       {!intent || delegations.length === 0 ? (
         <p className="empty">Confirm the intent to delegate authority to the agents.</p>
       ) : (
         <>
           <div className="chain">
             <div className="node">
-              <h3>You</h3>
+              <h3>Request</h3>
               <div className="amount">${intent.budget}</div>
               <ul>
                 <li><b>Goal</b> “{intent.goal}”</li>

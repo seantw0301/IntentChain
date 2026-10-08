@@ -47,73 +47,78 @@ function speak(id, text) {
 const SCENES = [
   {
     id: 'intro',
-    say: 'Your AI agent just delegated your task to another agent. And that agent delegated it again. So who makes sure it is still what you asked for? This is IntentChain: an intent integrity firewall for developers who let AI agents pay with PayPal.',
+    say: 'A ten-person company has no travel desk and no procurement team. AI agents could do that work. But no owner wants to hand an AI the company’s money. This is IntentChain: autonomous travel and procurement for small businesses, built on PayPal.',
     do: async (p) => {
-      await card(p, ['Your agent delegated your task to another agent.', 'That agent delegated it again.', 'Who makes sure it is still what you asked for?']);
-      await sleep(9500);
+      await card(p, ['Ten people. No travel desk. No procurement team.', 'AI agents could do the work.', 'Would you hand them the company’s money?']);
+      await sleep(10500);
       await card(p, null);
     },
   },
   {
-    id: 'intent',
-    say: 'I ask for a Tokyo business trip, with six hundred dollars. One sentence becomes a structured intent: the root that every payment must trace back to.',
+    id: 'policy',
+    say: 'The owner sets the rules once: what agents may buy, a trip budget, and an auto-pay limit of one hundred and fifty dollars. Above that, a manager approves. PayPal is connected once, through a billing agreement.',
     do: async (p) => {
-      await sleep(1500);
-      await guide(p);
       await view(p, '.panel');
     },
   },
   {
-    id: 'chain',
-    say: 'When I confirm, authority flows down a chain of agents. Each grant is smaller than its parent: less money, a narrower scope, and fewer PayPal tools. The hotel agent can search, but holds no PayPal tools at all. And every grant is signed over its parent’s signature.',
+    id: 'request',
+    say: 'An employee needs a trip to Tokyo for a client meeting. The request becomes a structured intent, and authority flows down a chain of agents. Each grant is smaller than its parent: less money, a narrower scope, fewer PayPal tools. And every grant is signed.',
     do: async (p) => {
-      await guide(p);
+      await guide(p, 3500);
+      await guide(p, 2500);
       await view(p, '.chain');
     },
   },
   {
     id: 'esim',
-    say: 'The travel agent buys an e-SIM. All four checks pass, so the firewall lets it call PayPal through the Agent Toolkit. I approve as the buyer, and the payment is captured.',
+    say: 'The travel agent buys an eighteen dollar e-SIM. Five checks pass, and it is under the limit. So it is paid instantly through PayPal, with nobody in the loop.',
     do: async (p) => {
-      await guide(p);
-      await view(p, '.checks');
-      await sleep(3500);
-      await pay(p);
+      await sleep(1000);
+      await guide(p, 3500);
       await view(p, '.checks');
     },
   },
   {
     id: 'attack',
-    say: 'Now an attack. An agent requests a grant with the same five hundred dollars, plus one new capability. Same amount, but not a subset. Rejected. And when the booking agent tries a seven hundred and eighty dollar suite, it is stopped, and named as the source.',
+    say: 'Now an attack. An agent requests a grant with the same five hundred dollars, plus one new capability. Same amount, but not a subset. Rejected. And a seven hundred and eighty dollar suite is stopped, with the responsible agent named.',
     do: async (p) => {
-      await sleep(1200);
+      await sleep(1000);
       await guide(p);
       await view(p, '.note.block');
-      await sleep(8500);
+      await sleep(7500);
+      await guide(p);
+      await view(p, '.checks');
+    },
+  },
+  {
+    id: 'policy-block',
+    say: 'A theme park ticket? The company blocks entertainment. Any expense policy would catch that.',
+    do: async (p) => {
       await guide(p);
       await view(p, '.checks');
     },
   },
   {
     id: 'drift',
-    say: 'Here is the subtle case. The travel agent delegates a vague task: improve the overall travel experience. It is a valid subset, so no rule rejects it. But its intent fidelity drops, and drift is flagged. That agent then buys a theme park ticket. It is affordable. It is in scope. It is within authority. It is not what I asked for. Blocked, and traced back to the exact hand-off where the intent drifted.',
+    say: 'Here is what a policy cannot catch. The travel agent hands off a vague task: improve the overall travel experience. It is a valid subset, so no rule rejects it. But its intent fidelity drops. That agent books a sunset dinner cruise, as a business meal. Allowed category. In budget. Within authority. Every policy check passes. But it is not what the employee was sent to do. Blocked, and traced to the exact hand-off where the intent drifted.',
     do: async (p) => {
-      await sleep(2500);
+      await sleep(2000);
       await guide(p);
       await view(p, '.branch');
-      await sleep(11000);
+      await sleep(10000);
       await guide(p);
       await view(p, '.checks');
     },
   },
   {
     id: 'hotel',
-    say: 'For the hotel, the agent records why it rejected the alternatives, before any money moves. Approved, and paid.',
+    say: 'The hotel is four hundred and eighty six dollars: over the limit. The agent records why it rejected the alternatives, and the manager approves in PayPal.',
     do: async (p) => {
       await guide(p);
       await view(p, '.checks');
       await click(p, p.getByRole('button', { name: 'Why this payment?' }));
-      await sleep(4500);
+      await sleep(4000);
       await click(p, p.getByRole('button', { name: 'Close' }));
       await pay(p);
       await view(p, '.checks');
@@ -121,35 +126,30 @@ const SCENES = [
   },
   {
     id: 'outcome',
-    say: 'Then the hotel cancels. The payment succeeded. The goal did not. IntentChain refunds through PayPal, and proposes a replacement that waits for my approval.',
+    say: 'Then the hotel cancels. The payment succeeded. The goal did not. IntentChain refunds through PayPal, and proposes a replacement.',
     do: async (p) => {
-      await sleep(1500);
+      await sleep(1200);
       await guide(p, 5000);
       await view(p, '.banner');
     },
   },
   {
     id: 'reconcile',
-    say: 'Finally, every order and refund is read back from PayPal, and matched against our own ledger.',
+    say: 'Every order and refund is read back from PayPal and matched to our ledger. And any outside agent can act under a signed grant token, and meets the same firewall.',
     do: async (p) => {
       await guide(p, 3500);
       await view(p, '.reconcile');
-    },
-  },
-  {
-    id: 'gateway',
-    say: 'And this is not limited to our agents. Any agent can act under a signed grant token through the gateway, and it meets the same firewall.',
-    do: async (p) => {
+      await sleep(3500);
       await p.locator('details.byo summary').click();
       await view(p, 'details.byo');
     },
   },
   {
     id: 'outro',
-    say: 'Agents can delegate tasks. They should not be able to delegate away your intent. IntentChain. Trust the chain, not just the agent.',
+    say: 'Let AI spend. Keep your business in control. IntentChain. Trust the chain, not just the agent.',
     do: async (p) => {
-      await card(p, ['IntentChain', 'Trust the chain, not just the agent.']);
-      await sleep(8500);
+      await card(p, ['Let AI spend. Keep your business in control.', 'IntentChain', 'Trust the chain, not just the agent.']);
+      await sleep(7500);
     },
   },
 ];
@@ -211,9 +211,9 @@ const cuts = []; // [start, end] in seconds of raw recording, removed from the f
 let t0 = 0;
 const now = () => (Date.now() - t0) / 1000;
 
-/** Pays the approved transaction: simulated approval, or the real PayPal sandbox with a human buyer. */
+/** Manager approval: simulated, or the real PayPal sandbox with a human approving. */
 async function pay(p) {
-  await click(p, p.getByRole('button', { name: 'Pay with PayPal' }));
+  await click(p, p.getByRole('button', { name: 'Approve & pay with PayPal' }));
   const simulated = p.getByRole('button', { name: 'Approve & capture' });
   const toPayPal = p.getByRole('link', { name: 'Continue to PayPal' });
   await simulated.or(toPayPal).first().waitFor({ timeout: 30000 });
@@ -227,7 +227,7 @@ async function pay(p) {
   await p.waitForURL(/paypal\.com/, { timeout: 60000 });
   await sleep(3000); // show the real PayPal page briefly
   const left = now();
-  console.log('\n>>> PayPal sandbox is waiting: log in and approve as the buyer in the browser window. <<<\n');
+  console.log('\n>>> PayPal sandbox is waiting: log in and approve as the manager in the browser window. <<<\n');
   await p.waitForURL((url) => url.href.startsWith(APP), { timeout: 10 * 60 * 1000 });
   await p.locator('.banner').waitFor({ timeout: 30000 });
   cuts.push([left, now() - 0.3]);

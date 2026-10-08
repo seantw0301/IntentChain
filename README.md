@@ -1,8 +1,9 @@
 # IntentChain
 
-**An intent integrity firewall for multi-agent commerce**, built on PayPal.
+**Autonomous travel & procurement for small businesses** — AI agents that book and buy through
+PayPal, inside limits the owner sets, checked at every hand-off between agents.
 
-> Trust the chain, not just the agent.
+> Let AI spend. Keep your business in control.
 
 Live demo: **https://demo.jxdtw.com/intentchain**
 
@@ -10,100 +11,105 @@ Built for the PayPal AI Hackathon.
 
 ## The problem
 
-Agentic commerce is not one agent with a wallet. One agent breaks the job down and hands pieces
-to other agents, and those agents hand pieces on again. Every hand-off is a chance for the
-original request to change: a little more authority here, a slightly broader task there.
+A ten-person company has no travel desk and no procurement team. AI agents could do that work:
+find the hotel, buy the eSIM, order the adapters, and pay for them. But no owner wants to hand an
+AI the company's money.
 
-Spending limits and policy rules check the last step — is this payment allowed? They do not
-check the path that led to it. So what happens when an agent delegates your task to another
-agent, and that one delegates it again? Who makes sure it is still what you asked for?
+Expense policies help — allowed categories, budgets, approval limits — but they check one thing:
+*is this purchase allowed?* Agents do not work alone. One agent breaks the job down and hands
+pieces to other agents, which hand pieces on again. A purchase can be an allowed category, within
+budget and within authority, and still not be what the employee was sent to do, because the task
+changed shape somewhere along the way.
 
 ## What IntentChain does
 
-IntentChain sits between the agents and PayPal and verifies the **whole delegation chain** before
-any PayPal tool can be called.
+**For the owner:** set a spending policy once — what agents may buy, a trip budget, and an
+auto-pay limit. Connect PayPal once.
 
-**1. Authority can only shrink.** Every grant from one agent to the next must be a subset of its
-parent in amount, per-night rate, place, dates, categories and lifetime. A grant that asks for one
-extra capability is rejected at the moment of delegation, even when the amount is unchanged.
+**For the team:** ask in one sentence. Agents arrange it and pay.
 
-**2. The chain is signed.** Each grant is HMAC-signed over its own limits *and its parent's
-signature*, back to the human intent. A grant that was altered or invented does not verify, and
-the transaction is refused.
+**Under the hood:** an intent integrity firewall sits between every agent and PayPal.
 
-**3. PayPal permissions shrink with it.** Each agent role has its own PayPal Agent Toolkit
-instance with only the tools it was granted. The Hotel Agent can search but holds no PayPal tools.
-The Recovery Agent can refund but cannot pay.
+| Outcome | When | What happens |
+|---|---|---|
+| **Auto-pay** | Passes all five checks and is at or under the auto-pay limit | Paid at once through the company's PayPal billing agreement. Nobody in the loop |
+| **Manager approval** | Passes all five checks but is over the limit | A manager approves it in PayPal; then it is captured |
+| **Blocked** | Any check fails | Nothing reaches PayPal. The firewall names the agent, or the delegation hop, responsible |
 
-**4. Intent drift is measured at every hop.** A grant can be a perfectly valid subset and still
-carry a task the human never asked for. Each grant's stated purpose is scored against the original
-intent, so drift is caught where it starts — and anything bought further down is traced back to
-that hop.
-
-**5. Four independent checks gate each payment.**
+The five checks are independent, and all five are shown for every transaction:
 
 | Check | Question | Decided by |
 |---|---|---|
-| **Budget** | Is there money left? | Rule |
+| **Policy** | Does the company allow this kind of purchase at all? | Rule |
+| **Budget** | Is there money left for this request? | Rule |
 | **Authority** | May *this* agent spend this much, over a chain that verifies? | Rule + signatures |
 | **Scope** | Right place, right dates? | Rule |
-| **Intent** | Does this purchase serve the human's original goal? | Stated restrictions + AI |
+| **Intent** | Does it serve what the employee was actually sent to do? | AI, attributed to the delegation chain |
 
-The AI can block a payment or send it to a human for review. It can never approve one by itself.
+The first four are what an expense policy can do. The fifth, and the chain behind it, is what
+makes this different:
 
-**6. Payment is not the finish line.** If the hotel cancels after a successful payment, the
-transaction is marked *outcome failed*, refunded through PayPal, and a replacement is proposed
-that needs fresh human approval.
+- **Authority can only shrink.** Every grant from one agent to the next must be a subset of its
+  parent in amount, per-night rate, place, dates, categories and lifetime. A grant that asks for
+  one extra capability is rejected at the moment of delegation, even when the amount is unchanged.
+- **The chain is signed.** Each grant is HMAC-signed over its own limits *and its parent's
+  signature*. A grant that was altered or invented does not verify.
+- **PayPal permissions shrink with it.** Each agent role has its own PayPal Agent Toolkit instance
+  with only the tools it was granted. The Hotel Agent can search but holds no PayPal tools. The
+  Recovery Agent can refund but cannot pay.
+- **Intent drift is measured at every hop.** A grant can be a perfectly valid subset and still
+  carry a task nobody asked for. Each grant's wording is scored against the original request, so
+  drift is caught where it starts — and anything bought further down is traced back to that hop.
+- **Payment is not the finish line.** If the hotel cancels after a successful payment, the
+  transaction is marked *outcome failed*, refunded through PayPal, and a replacement is proposed
+  that needs fresh approval.
 
-Every step is written to an audit log keyed by the intent id, and each transaction can show its
-full lineage: human intent → each signed grant → the decision → the payment.
+The AI can block a payment or send it to a human. It can never approve one by itself.
 
 ## The demo story
 
-Open the demo and follow the numbered steps.
+Open the demo and press the button in the guide bar; it walks through the story one step at a time.
 
-| # | What happens | Result | What it shows |
-|---|---|---|---|
-| 1 | Confirm the intent | Chain of three signed grants, each narrower than the last | Authority and PayPal tools shrink per hop |
-| 2 | Travel Agent buys a Japan eSIM, $18 | **Approved → paid** | A legitimate purchase flows straight to PayPal |
-| 3 | **Simulate delegation attack** | **Delegation rejected** | Same amount, one extra capability — not a subset |
-| 4 | Booking Agent tries a luxury hotel, $780 | **Blocked** — authority exceeded | The agent is named as the source |
-| 5 | Travel Agent delegates “improve the overall travel experience” | **Accepted, flagged as intent drift** | Structurally valid, semantically off |
-| 6 | Experience Agent buys a theme park ticket, $120 | **Blocked** — intent mismatch | Budget, authority and scope all pass. Traced back to the drifting hop |
-| 7 | Compare hotels, book Hotel B, $486 | **Approved → paid** | “Why this payment?” shows the rejected alternatives |
-| 8 | Hotel cancels the booking | **Outcome failed → refunded → recovery** | Payment success is not intent success |
+| Purchase | Policy | Budget | Authority | Scope | Intent | Result |
+|---|---|---|---|---|---|---|
+| eSIM, $18 | pass | pass | pass | pass | pass | **Auto-paid** through PayPal |
+| Hotel, $486 | pass | pass | pass | pass | pass | **Manager approval**, then captured |
+| Luxury suite, $780 | pass | fail | fail | pass | — | **Blocked** — authority exceeded |
+| Theme park ticket, $120 | fail | pass | pass | pass | fail | **Blocked** — company policy |
+| Sunset dinner cruise, $95 | pass | pass | pass | pass | fail | **Blocked** — intent drift |
 
-Also try **Simulate forged grant** (an agent presents a grant whose limit was raised after
-signing), the **airport transfer** (relevant but over budget) and **Try your own purchase**
-(propose anything and watch the four checks).
+The last row is the point. The cruise is booked as a business meal by an agent that was handed a
+vague task (“improve the overall travel experience”). Every policy check passes. The firewall
+blocks it anyway and traces it to the hand-off where the task drifted.
+
+Along the way the demo also shows a **delegation attack** (same amount, one extra capability —
+rejected), a **forged grant**, **decision provenance** for the hotel (“Why this payment?”), the
+hotel **cancelling after payment** (refund and recovery), and **reconciliation** against PayPal.
+
+Things to try yourself: unblock *Entertainment* in the policy and buy the theme park ticket again
+(policy now passes; intent still says no), change the auto-pay limit, delegate a task in your own
+words, or propose any purchase.
 
 ## How PayPal is used
 
-All payment actions go through the [PayPal Agent Toolkit](https://github.com/paypal/agent-toolkit)
-(`@paypal/agent-toolkit`), in the sandbox:
+Everything runs in the PayPal sandbox. Sandbox mode is hard-wired; the app cannot reach live PayPal.
 
-| Toolkit tool | Used for |
+| What | How |
 |---|---|
-| `create_order` | Creating the order once the firewall approves. The intent id, agent and transaction id are written into the order's line-item description, so the PayPal record itself links back to the human intent |
-| `get_order` | Checking the buyer approved before capturing — a capture is never retried blindly — and reading orders back for reconciliation |
-| `pay_order` | Capturing the payment |
-| `create_refund` | Refunding when the outcome fails |
-| `get_refund` | Confirming the refund during reconciliation |
+| **Auto-pay** | A PayPal **billing agreement** the owner approves once. Orders under the limit are created and captured in a single Orders API call against that agreement, with the transaction id as the idempotency key — no buyer present |
+| **Manager approval** | PayPal Agent Toolkit `create_order` → the manager approves in PayPal → `get_order` → `pay_order` |
+| **Refunds** | PayPal Agent Toolkit `create_refund` when an outcome fails |
+| **Reconciliation** | PayPal Agent Toolkit `get_order` and `get_refund` read every order back and compare it with IntentChain's ledger |
+| **Webhooks** | `POST /intentchain/api/paypal/webhook`. Each delivery is verified with PayPal before it is applied |
+| **Lineage** | The intent id, agent and transaction id are written into every order's line-item description, so the PayPal record itself links back to the request |
 
-Each agent role gets its own toolkit instance with only the actions it is allowed
-([`src/lib/paypal.ts`](src/lib/paypal.ts)), so PayPal permissions narrow along the delegation
-chain exactly as spending authority does. Sandbox mode is hard-wired; the app cannot reach live
-PayPal.
+Each agent role gets its own [PayPal Agent Toolkit](https://github.com/paypal/agent-toolkit)
+instance with only the actions it is allowed ([`src/lib/paypal.ts`](src/lib/paypal.ts)), so PayPal
+permissions narrow along the delegation chain exactly as spending authority does.
 
-**Buyer approval is real.** You are redirected to the PayPal sandbox, approve with a sandbox
-personal account, and are returned to the app, which then captures.
-
-**Reconciliation.** *Reconcile with PayPal* reads every order and refund back from PayPal and
-compares it with IntentChain's own ledger, row by row.
-
-**Webhooks.** `POST /intentchain/api/paypal/webhook` accepts PayPal deliveries, asks PayPal to
-verify each signature, and only then updates the transaction and the audit timeline. Webhooks are
-not part of the Agent Toolkit, so signature verification is the one direct REST call in the app.
+Two calls go to the PayPal REST API directly because the Agent Toolkit does not cover them:
+auto-pay against a billing agreement, and webhook signature verification. Both reuse the toolkit's
+sandbox client for authentication.
 
 ## Bring your own agent
 
@@ -122,7 +128,7 @@ curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/jso
 
 `$TOKEN` is a **grant token**: a signed delegation, copied from the chain with *Copy agent token*.
 The gateway verifies the signature chain, lists only the tools that grant carries (the Hotel Agent
-has no token because it has no PayPal tools), runs the same four checks, and lets an agent see
+has no token because it has no PayPal tools), runs the same five checks, and lets an agent see
 only the transactions made under its own grant.
 
 [`examples/claude-agent.mjs`](examples/claude-agent.mjs) is a complete LLM agent built on this:
@@ -167,6 +173,7 @@ what you put in it:
 |---|---|
 | Nothing | Fully working demo. Payments are **simulated** and AI scores come from bundled **cached** reference data. Both are labelled as such in the UI |
 | `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET` | Real PayPal **sandbox** orders, captures and refunds |
+| `PAYPAL_AUTOPAY_AGREEMENT_ID` | Real **auto-pay**: the id of a sandbox billing agreement a buyer approved for your app. Without it, small purchases fall back to checkout |
 | `JEV_API_KEY` | **Live** AI intent analysis |
 
 To get PayPal sandbox credentials, create a sandbox app at
@@ -195,7 +202,8 @@ All paths are under `/intentchain/api`. Every `POST` returns the full, fresh sta
 
 | Method | Path | Body |
 |---|---|---|
-| `POST` | `/intent` | `{ prompt }` |
+| `GET` / `PUT` | `/company/policy` | read the policy; `{ auto_pay_limit }` or `{ toggle: category }` to change it |
+| `POST` | `/intent` | `{ prompt }` — refused if it exceeds the company trip budget |
 | `POST` | `/intent/{id}/confirm` | — |
 | `POST` | `/delegate` | `{ parent, agent, budget, scope, expires_at }` — rejected with `422` if not a subset of the parent. `{ simulate: "escalation" \| "forgery" \| "experience" }` runs the scripted delegation events |
 | `POST` | `/transaction/evaluate` | `{ step }` or `{ name, amount, category }` |
@@ -218,7 +226,8 @@ src/components/     UI panels
 src/lib/
   intent.ts         intent extraction and confirmation
   delegation.ts     monotonic rule, signed chain, intent fidelity per hop
-  validator.ts      the four checks
+  policy.ts         the owner's spending policy
+  validator.ts      the five checks and payment routing
   agents.ts         agent workflows and decision provenance
   paypal.ts         PayPal Agent Toolkit access, per-role permissions
   payments.ts       order, capture, refund, outcome, recovery, reconciliation, webhooks
@@ -245,7 +254,8 @@ More detail: [docs/architecture.md](docs/architecture.md).
 ## Limits of the demo
 
 - Hotels and products are fixed demo data; there is no live product search.
-- One scenario (a short business trip) is scripted. Custom purchases let you go off-script.
+- One scenario (a short business trip) is scripted, and the agents follow fixed workflows; the AI supplies judgement, not planning. Custom purchases, your own delegated tasks and the agent gateway let you go off-script.
+- The hosted demo shares one sandbox billing agreement for auto-pay, so every visitor's auto-paid purchases come from the same sandbox buyer.
 - Recovery stops at a proposal awaiting human approval; it does not pay for the replacement.
 - Grants are signed with a server-held HMAC key. Agents here run inside one process; in a real deployment each agent would hold its own key.
 - No accounts: each browser session gets isolated state that is discarded after 24 idle hours.

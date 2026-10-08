@@ -13,12 +13,12 @@ export function IntentPanel({ state, call, busy }: { state: AppState; call: Call
   if (!intent) {
     return (
       <section className="panel">
-        <h2><span className="step">1</span>Human intent</h2>
-        <label htmlFor="prompt">Tell your agents what you need</label>
+        <h2><span className="step">2</span>Employee request</h2>
+        <label htmlFor="prompt">What does the team need?</label>
         <textarea id="prompt" value={prompt} maxLength={600} onChange={(e) => setPrompt(e.target.value)} />
         <div className="row end" style={{ marginTop: 10 }}>
           <button className="btn primary" disabled={busy !== null || prompt.trim().length < 8} onClick={() => call('intent', { prompt })}>
-            {busy === 'intent' ? 'Reading intent…' : 'Create intent'}
+            {busy === 'intent' ? 'Reading request…' : 'Submit request'}
           </button>
         </div>
       </section>
@@ -28,7 +28,7 @@ export function IntentPanel({ state, call, busy }: { state: AppState; call: Call
   return (
     <section className="panel">
       <h2>
-        <span className="step">1</span>Human intent
+        <span className="step">2</span>Employee request
         <span className={`tag ${intent.source}`}>{intent.source === 'jev' ? 'AI extracted' : 'cached extraction'}</span>
       </h2>
       <p className="quote">“{intent.prompt}”</p>
@@ -49,7 +49,7 @@ export function IntentPanel({ state, call, busy }: { state: AppState; call: Call
         </dd>
         <dt>Dates</dt>
         <dd>{intent.trip_start} → {intent.trip_end} ({intent.nights} nights)</dd>
-        <dt>Restrictions</dt>
+        <dt>Company blocks</dt>
         <dd className="chips">
           {intent.restrictions.map((r) => (
             <span className="chip no" key={r.label}>{r.label}</span>
@@ -65,7 +65,7 @@ export function IntentPanel({ state, call, busy }: { state: AppState; call: Call
         </div>
       ) : (
         <div className="note pass" style={{ marginTop: 12 }}>
-          Intent active. Every transaction below must trace back to <code>{intent.id}</code>.
+          Request active. Every transaction below must trace back to <code>{intent.id}</code>.
         </div>
       )}
     </section>

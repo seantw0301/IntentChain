@@ -7,11 +7,12 @@ import { AuditPanel } from '@/components/AuditPanel';
 import { ChainPanel } from '@/components/ChainPanel';
 import { GuideBar } from '@/components/GuideBar';
 import { IntentPanel } from '@/components/IntentPanel';
+import { PolicyPanel } from '@/components/PolicyPanel';
 import { ValidationCard } from '@/components/ValidationCard';
 
 const BASE = '/intentchain';
 
-export type Call = (path: string, body?: Record<string, unknown>) => Promise<boolean>;
+export type Call = (path: string, body?: Record<string, unknown>, method?: 'POST' | 'PUT') => Promise<boolean>;
 
 export default function Home() {
   const [state, setState] = useState<AppState | null>(null);
@@ -31,11 +32,11 @@ export default function Home() {
 
   // POSTs to the API; every endpoint answers with the full, fresh state.
   const call = useCallback<Call>(
-    async (path, body = {}) => {
+    async (path, body = {}, method = 'POST') => {
       setBusy(path);
       try {
         const res = await fetch(`${BASE}/api/${path}`, {
-          method: 'POST',
+          method,
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
         });
@@ -90,7 +91,7 @@ export default function Home() {
           <div className="logo" aria-hidden>IC</div>
           <div>
             <h1>IntentChain</h1>
-            <p>Intent integrity firewall for multi-agent commerce</p>
+            <p>Autonomous travel &amp; procurement for small businesses</p>
           </div>
         </div>
         <div className="badges">
@@ -115,24 +116,24 @@ export default function Home() {
         </button>
       </header>
 
-      <section className="hero" aria-label="What makes IntentChain different">
+      <section className="hero" aria-label="What IntentChain is">
         <div className="hero-main">
-          <h2>Trust the chain, not just the agent.</h2>
+          <h2>Let AI spend. Keep your business in control.</h2>
           <p>
-            Your agent delegates to another agent. That one delegates again. IntentChain verifies every hop still
-            carries what <em>you</em> asked for — before a payment reaches PayPal.
+            A ten-person company has no travel desk and no procurement team. IntentChain lets AI agents book and buy through
+            PayPal — inside limits the owner sets, and checked at <em>every hand-off between agents</em>.
           </p>
         </div>
         <div className="versus">
           <div className="vs them">
-            <span className="vs-label">Payment guardrails ask</span>
-            <span className="vs-q">“Is this agent allowed to make this payment?”</span>
-            <span className="vs-flow">Intent → Agent → Pay</span>
+            <span className="vs-label">Expense policies ask</span>
+            <span className="vs-q">“Is this purchase allowed?”</span>
+            <span className="vs-flow">Policy → Pay</span>
           </div>
           <div className="vs us">
-            <span className="vs-label">IntentChain asks</span>
-            <span className="vs-q">“After three hand-offs, is this still what the human authorized?”</span>
-            <span className="vs-flow">Intent → Agent → Agent → Agent → <b>verify the whole chain</b> → Pay</span>
+            <span className="vs-label">IntentChain also asks</span>
+            <span className="vs-q">“After three hand-offs between agents, is it still what the employee was sent to do?”</span>
+            <span className="vs-flow">Trust the chain, not just the agent.</span>
           </div>
         </div>
       </section>
@@ -140,10 +141,16 @@ export default function Home() {
       <GuideBar state={state} call={call} busy={busy} />
 
       {/* panels appear as the story reaches them, so the first screen stays simple */}
-      <div className={`grid ${state.delegations.length ? 'two' : ''}`}>
+      <div className="grid two">
+        <PolicyPanel state={state} call={call} busy={busy} />
         <IntentPanel state={state} call={call} busy={busy} />
-        {state.delegations.length > 0 && <ChainPanel state={state} call={call} busy={busy} />}
       </div>
+
+      {state.delegations.length > 0 && (
+        <div className="grid">
+          <ChainPanel state={state} call={call} busy={busy} />
+        </div>
+      )}
 
       {active && (
         <div className="grid mid">
@@ -197,8 +204,9 @@ function describe(type: string, d: Record<string, unknown>): string {
   const item = d.item ? `${d.item}` : '';
   const amount = d.amount !== undefined ? ` $${d.amount}` : '';
   switch (type) {
-    case 'intent.created': return `Intent created — ${d.goal}, $${d.budget}`;
-    case 'intent.confirmed': return 'Intent confirmed by the human';
+    case 'policy.updated': return `Company policy updated — auto-pay up to $${d.auto_pay_limit}`;
+    case 'intent.created': return `Request received — ${d.goal}, $${d.budget}`;
+    case 'intent.confirmed': return 'Request confirmed';
     case 'delegation.created': return `Delegated to ${d.agent} agent — up to $${d.budget}`;
     case 'delegation.rejected': {
       const added = (d.new_capabilities as string[] | undefined) ?? [];
@@ -210,11 +218,12 @@ function describe(type: string, d: Record<string, unknown>): string {
     case 'delegation.forged': return `Forged grant rejected — claimed $${d.claimed_budget}, signed $${d.signed_budget}`;
     case 'decision.recorded': return `Decision recorded — selected ${d.selected}`;
     case 'transaction.proposed': return `Proposed ${item}${amount}`;
-    case 'transaction.approved': return `${item}${amount} approved`;
+    case 'transaction.approved':
+      return `${item}${amount} passed the firewall — ${d.payment_route === 'AUTO_PAY' ? 'auto-pay' : d.payment_route === 'MANAGER_APPROVAL' ? 'manager approval required' : 'approved'}`;
     case 'transaction.warning': return `${item}${amount} needs human review`;
     case 'transaction.blocked': return `${item}${amount} blocked — ${String(d.reason ?? '').replace(/_/g, ' ').toLowerCase()}`;
     case 'payment.order_created': return `PayPal order created for ${item}${d.mode === 'mock' ? ' (simulated)' : ''}`;
-    case 'payment.captured': return `PayPal captured${amount} for ${item}${d.mode === 'mock' ? ' (simulated)' : ''}`;
+    case 'payment.captured': return `PayPal ${d.auto ? 'auto-paid' : 'captured'}${amount} for ${item}${d.mode === 'mock' ? ' (simulated)' : ''}`;
     case 'payment.failed': return `Payment failed for ${item}`;
     case 'outcome.failed': return `Outcome failed — ${item} was cancelled`;
     case 'payment.refunded': return `Refunded${amount} for ${item}${d.mode === 'mock' ? ' (simulated)' : ''}`;

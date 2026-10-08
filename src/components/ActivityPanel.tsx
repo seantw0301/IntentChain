@@ -9,13 +9,14 @@ type Step = { key: string; item?: string; title: string; who: string; price?: nu
 const STEPS: Step[] = [
   { key: 'esim', item: 'esim', title: 'Japan eSIM', who: 'Travel Agent', price: 18 },
   { key: 'luxury-hotel', item: 'luxury-hotel', title: 'Luxury hotel', who: 'Booking Agent goes over its limit', price: 780 },
+  { key: 'theme-park', item: 'theme-park', title: 'Theme park ticket', who: 'Travel Agent', price: 120 },
   { key: 'experience', delegate: 'experience', title: 'Delegate “improve the travel experience”', who: 'Travel Agent → Experience Agent' },
-  { key: 'theme-park', item: 'theme-park', title: 'Theme park ticket', who: 'Experience Agent', price: 120 },
+  { key: 'dinner-cruise', item: 'dinner-cruise', title: 'Sunset dinner cruise', who: 'Experience Agent, as a business meal', price: 95 },
   { key: 'hotel', item: 'hotel-b', title: 'Compare hotels and book', who: 'Hotel Agent → Booking Agent', price: 486 },
   { key: 'airport-transfer', item: 'airport-transfer', title: 'Airport transfer', who: 'Travel Agent', price: 110 },
 ];
 
-const CATEGORIES = ['lodging', 'connectivity', 'transport', 'entertainment', 'subscription', 'other'];
+const CATEGORIES = ['lodging', 'connectivity', 'transport', 'meals', 'office', 'entertainment', 'subscription', 'gaming', 'other'];
 
 export function ActivityPanel({
   state,
@@ -44,7 +45,7 @@ export function ActivityPanel({
 
   return (
     <section className="panel">
-      <h2><span className="step">3</span>Agent activity</h2>
+      <h2><span className="step">4</span>Agent activity</h2>
       {!active ? (
         <p className="empty">Agents start working once the intent is confirmed.</p>
       ) : (
@@ -73,7 +74,7 @@ export function ActivityPanel({
               onClick={() => hotel && call('outcome/event', { transaction_id: hotel.id, type: 'booking_cancelled' })}
               title={hotel ? '' : 'Available after the hotel payment is captured'}
             >
-              <span className="n">7</span>
+              <span className="n">8</span>
               <span className="t">
                 Hotel cancels the booking
                 <span className="s">Outcome event after payment</span>
@@ -81,7 +82,7 @@ export function ActivityPanel({
               <span className="p">!</span>
             </button>
           </div>
-          {unpaid && <p className="hint" style={{ marginTop: 10 }}>An approved purchase is waiting for payment on the right.</p>}
+          {unpaid && <p className="hint" style={{ marginTop: 10 }}>A purchase is waiting for manager approval on the right.</p>}
 
           <details className="custom">
             <summary>Try your own purchase</summary>

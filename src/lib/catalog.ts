@@ -38,6 +38,17 @@ export const ITEMS: Record<string, CatalogItem> = {
     day_offset: 1,
     reference_score: 21,
   },
+  'dinner-cruise': {
+    id: 'dinner-cruise',
+    name: 'Tokyo Bay Sunset Dinner Cruise',
+    merchant: 'Tokyo Bay Cruises',
+    description: 'Evening sightseeing cruise with dinner, one guest',
+    amount: 95,
+    category: 'meals',
+    location: 'Tokyo',
+    day_offset: 1,
+    reference_score: 18,
+  },
   'hotel-a': {
     id: 'hotel-a',
     name: 'Hotel A — Bayside Inn',
@@ -111,8 +122,11 @@ export const CATEGORIES: Category[] = [
   'lodging',
   'connectivity',
   'transport',
+  'meals',
+  'office',
   'entertainment',
   'subscription',
+  'gaming',
   'other',
 ];
 
@@ -120,8 +134,11 @@ const BUSINESS_DEFAULT: Record<Category, number> = {
   lodging: 90,
   connectivity: 92,
   transport: 86,
+  meals: 66,
+  office: 68,
   entertainment: 20,
   subscription: 15,
+  gaming: 5,
   other: 60,
 };
 
@@ -129,8 +146,11 @@ const LEISURE_DEFAULT: Record<Category, number> = {
   lodging: 90,
   connectivity: 88,
   transport: 86,
+  meals: 85,
+  office: 40,
   entertainment: 91,
   subscription: 25,
+  gaming: 30,
   other: 60,
 };
 

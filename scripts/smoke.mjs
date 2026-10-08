@@ -18,7 +18,7 @@ function client() {
     const res = await fetch(`${API}/${path}`, {
       method,
       headers: { 'Content-Type': 'application/json', ...(cookie ? { Cookie: cookie } : {}) },
-      body: method === 'POST' ? JSON.stringify(body ?? {}) : undefined,
+      body: method === 'POST' || method === 'PUT' ? JSON.stringify(body ?? {}) : undefined,
     });
     const set = res.headers.get('set-cookie');
     if (set) cookie = set.split(';')[0];
@@ -50,8 +50,13 @@ const mock = r.json.config?.paypal_mode === 'mock';
 console.log(`Server: ${ORIGIN}  PayPal: ${r.json.config?.paypal_mode}  AI: ${r.json.config?.ai_mode}\n`);
 check('fresh session is empty', r.json.intent === null && r.json.transactions.length === 0);
 
+check('company policy is in place before any request',
+  r.json.policy?.auto_pay_limit === 150 && r.json.policy.blocked_categories.includes('entertainment'), JSON.stringify(r.json.policy));
+r = await api('POST', 'intent', { prompt: 'Sean needs a week in Tokyo for a client meeting. Trip budget: $2000.' });
+check('a request above the company trip budget is refused', r.status === 422 && r.json.error?.code === 'OVER_COMPANY_BUDGET', JSON.stringify(r.json.error));
+
 r = await api('POST', 'intent', {
-  prompt: 'I have a client meeting in Tokyo next week. Find me a hotel and an eSIM. Total budget: $600. This is a business trip.',
+  prompt: 'Sean from the product team is traveling to Tokyo for a client meeting next week. Arrange his hotel and eSIM under the company travel policy. Trip budget: $600.',
 });
 const intent = r.json.intent;
 check('intent extracted: $600 business trip to Tokyo',
@@ -83,15 +88,16 @@ check('forged grant rejected: signature chain does not verify',
 r = await api('GET', 'audit');
 check('rejected and forged grants were never stored', r.json.delegations.length === 3);
 
-// 1. legitimate purchase
+// 1. small legitimate purchase → auto-pay
 r = await api('POST', 'transaction/evaluate', { step: 'esim' });
 let tx = last(r.json);
-check('Test 1 — eSIM $18 approved, all four checks pass',
-  tx.status === 'APPROVED' && tx.validation.budget.pass && tx.validation.authority.pass && tx.validation.scope.pass && tx.validation.intent.status === 'pass',
-  JSON.stringify(tx.validation));
-if (mock) {
-  const s = await pay(api, tx.id);
-  check('eSIM captured through PayPal (simulated)', last(s).status === 'CAPTURED' && s.metrics.spent === 18);
+const v1 = tx.validation;
+check('eSIM $18: all five checks pass, routed to auto-pay',
+  v1.policy.pass && v1.budget.pass && v1.authority.pass && v1.scope.pass && v1.intent.status === 'pass' && v1.payment_route === 'AUTO_PAY',
+  JSON.stringify(v1));
+if (r.json.autopay.connected) {
+  check('eSIM is paid at once through the billing agreement, nobody in the loop',
+    tx.status === 'CAPTURED' && tx.payment?.via === 'billing_agreement' && r.json.metrics.spent === 18, `${tx.status} ${JSON.stringify(tx.payment)}`);
 }
 
 // 2. authority exceeded
@@ -104,21 +110,38 @@ check('responsibility: the Booking Agent is named as the source', tx.validation.
 r = await api('POST', 'paypal/order', { transaction_id: tx.id });
 check('a blocked transaction can never reach PayPal', r.status === 409);
 
-// 3. intent drift across hops — the key case
+// 3. what any expense policy catches: a blocked category
+r = await api('POST', 'transaction/evaluate', { step: 'theme-park' });
+tx = last(r.json);
+check('theme park $120: blocked by company policy (and intent fails too)',
+  tx.status === 'BLOCKED' && tx.validation.reason_code === 'POLICY_VIOLATION' && !tx.validation.policy.pass &&
+  tx.validation.budget.pass && tx.validation.authority.pass && tx.validation.scope.pass && tx.validation.intent.status === 'fail',
+  JSON.stringify(tx.validation));
+
+// the owner unblocks entertainment: policy now passes, intent still says no
+r = await api('PUT', 'company/policy', { toggle: 'entertainment' });
+check('owner can change the policy', r.status === 200 && r.json.policy.allowed_categories.includes('entertainment'));
+r = await api('POST', 'transaction/evaluate', { step: 'theme-park' });
+tx = last(r.json);
+check('with entertainment allowed, the theme park passes policy but still fails intent',
+  tx.status === 'BLOCKED' && tx.validation.policy.pass && tx.validation.reason_code === 'INTENT_MISMATCH', JSON.stringify(tx.validation));
+await api('PUT', 'company/policy', { toggle: 'entertainment' });
+
+// 4. the key case: every policy check passes, the chain has drifted
 r = await api('POST', 'delegate', { simulate: 'experience' });
 const exp = r.json.delegations?.find((x) => x.agent === 'experience');
 check('drifting delegation is a valid subset, so it is accepted', r.status === 200 && exp?.budget === 150 && exp?.parent === d[0].id, JSON.stringify(r.json.error ?? exp));
 check('…but its purpose is flagged as intent drift', exp?.drift === true && exp.fidelity.score < 65, JSON.stringify(exp?.fidelity));
-r = await api('POST', 'transaction/evaluate', { step: 'theme-park' });
+r = await api('POST', 'transaction/evaluate', { step: 'dinner-cruise' });
 tx = last(r.json);
-check('theme park is proposed by the Experience Agent over a verified 2-hop chain', tx.agent === 'experience' && tx.validation.chain_hops === 2);
+check('dinner cruise $95: policy, budget, authority, scope PASS — intent FAIL',
+  tx.status === 'BLOCKED' && tx.validation.policy.pass && tx.validation.budget.pass && tx.validation.authority.pass &&
+  tx.validation.scope.pass && tx.validation.intent.status === 'fail' && tx.validation.reason_code === 'INTENT_DRIFT',
+  JSON.stringify(tx.validation));
+check('proposed by the Experience Agent over a verified 2-hop chain', tx.agent === 'experience' && tx.validation.chain_hops === 2);
 check('responsibility: traced to the Travel → Experience delegation hop',
   /Travel Agent → Experience Agent/.test(tx.validation.violation?.source ?? '') && /Intent drift/.test(tx.validation.violation?.type ?? '') && tx.validation.violation.delegation_id === exp?.id,
   JSON.stringify(tx.validation.violation));
-check('Test 4 — theme park $120: budget, authority, scope PASS; intent FAIL',
-  tx.status === 'BLOCKED' && tx.validation.reason_code === 'INTENT_MISMATCH' &&
-  tx.validation.budget.pass && tx.validation.authority.pass && tx.validation.scope.pass && tx.validation.intent.status === 'fail',
-  JSON.stringify(tx.validation));
 
 // agent gateway: an outside agent acting under a grant token
 {
@@ -134,13 +157,16 @@ check('Test 4 — theme park $120: budget, authority, scope PASS; intent FAIL',
   check('gateway: a grant lists only its own PayPal tools',
     g.status === 200 && g.json.agent === 'experience' && g.json.tools.some((t) => t.name === 'create_order'), JSON.stringify(g.json));
   g = await agent(tokenOf('experience'), '/create_order', { item_name: 'Karaoke night', amount_usd: 60, category: 'entertainment' });
-  check('gateway: an outside agent is blocked by the same firewall, traced to the drifting hop',
-    g.status === 200 && g.json.blocked === true && g.json.reason_code === 'INTENT_MISMATCH' && /Experience Agent/.test(g.json.violation?.source ?? ''),
+  check('gateway: an outside agent is stopped by company policy',
+    g.status === 200 && g.json.blocked === true && g.json.reason_code === 'POLICY_VIOLATION', JSON.stringify(g.json));
+  g = await agent(tokenOf('experience'), '/create_order', { item_name: 'Evening sightseeing river cruise with dinner', amount_usd: 80, category: 'meals' });
+  check('gateway: an allowed category still fails on intent, traced to the drifting hop',
+    g.status === 200 && g.json.blocked === true && g.json.reason_code === 'INTENT_DRIFT' && /Experience Agent/.test(g.json.violation?.source ?? ''),
     JSON.stringify(g.json));
   g = await agent(tokenOf('experience'), '/create_refund', { transaction_id: 'x' });
   check('gateway: a tool outside the grant is refused', g.status === 403 && g.json.error?.code === 'TOOL_NOT_GRANTED', JSON.stringify(g.json));
-  g = await agent(tokenOf('travel'), '/create_order', { item_name: 'Pocket Wi-Fi rental for the meeting days', amount_usd: 25, category: 'connectivity' });
-  check('gateway: a legitimate purchase gets a PayPal order',
+  g = await agent(tokenOf('travel'), '/create_order', { item_name: 'Train pass to reach the client office on the meeting days', amount_usd: 160, category: 'transport' });
+  check('gateway: a legitimate purchase above the auto-pay limit waits for a manager',
     g.status === 200 && g.json.blocked === false && (g.json.status === 'ORDER_CREATED' || g.json.status === 'WARNING'), JSON.stringify(g.json));
   const theirs = g.json.transaction_id;
   g = await agent(tokenOf('experience'), '/get_order', { transaction_id: theirs });
@@ -164,12 +190,14 @@ tx = last(r.json);
 const decision = r.json.decisions.at(-1);
 check('hotel decision recorded: B selected, A and C rejected',
   decision?.selected_item_id === 'hotel-b' && decision.options.filter((o) => o.outcome === 'REJECTED').length === 2);
-check('Hotel B $486 approved', tx.status === 'APPROVED' && tx.item.amount === 486, JSON.stringify(tx.validation));
+check('Hotel B $486: passes all five checks, held for manager approval',
+  tx.status === 'APPROVED' && tx.item.amount === 486 && tx.validation.payment_route === 'MANAGER_APPROVAL', JSON.stringify(tx.validation));
 const hotelId = tx.id;
 
 if (mock) {
   let s = await pay(api, hotelId);
-  check('hotel captured, $504 spent', last(s).status === 'CAPTURED' && s.metrics.spent === 504, `spent ${s.metrics.spent}`);
+  check('manager approves: hotel captured through checkout, $504 spent',
+    last(s).status === 'CAPTURED' && last(s).payment.via === 'checkout' && s.metrics.spent === 504, `spent ${s.metrics.spent}`);
   check('single-use booking grant is now USED', s.delegations[2].status === 'USED');
 
   // 5. over budget
@@ -189,7 +217,8 @@ if (mock) {
   check('dashboard: authority integrity 100%, recovery active',
     s.metrics.authority_integrity === 100 && s.metrics.outcome_status === 'Recovery Active', JSON.stringify(s.metrics));
   if (s.config.ai_mode === 'cached') check('dashboard: intent integrity 94%', s.metrics.intent_integrity === 94, `${s.metrics.intent_integrity}`);
-  check('every audit event carries the intent id', s.events.every((e) => e.intent_id === intent.id));
+  check('every agent and payment event carries the intent id',
+    s.events.filter((e) => !e.type.startsWith('policy.')).every((e) => e.intent_id === intent.id));
   r = await api('POST', 'audit/reconcile');
   const recon = r.json.events.findLast((e) => e.type === 'audit.reconciled');
   check('reconciliation lists every transaction that reached PayPal', r.status === 200 && recon?.data.rows.length >= 2, JSON.stringify(recon?.data));

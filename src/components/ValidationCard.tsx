@@ -33,7 +33,7 @@ export function ValidationCard({
   if (!tx) {
     return (
       <section className="panel">
-        <h2><span className="step">4</span>IntentChain firewall</h2>
+        <h2><span className="step">5</span>IntentChain firewall</h2>
         <p className="empty">
           Each purchase an agent proposes is checked against the whole delegation chain here — before any PayPal tool is called.
         </p>
@@ -59,28 +59,50 @@ export function ValidationCard({
     if (ok) setApproving(true);
   };
 
+  const limit = state.policy.auto_pay_limit;
+  const auto = tx.payment?.via === 'billing_agreement';
   let banner: { tone: string; label: string; msg: string };
   switch (tx.status) {
-    case 'BLOCKED':
-      banner = { tone: 'block', label: `BLOCKED — ${v.reason_code.replace(/_/g, ' ')}`, msg: v.headline };
+    case 'BLOCKED': {
+      const label =
+        v.reason_code === 'POLICY_VIOLATION' ? 'COMPANY POLICY' : v.reason_code.replace(/_/g, ' ');
+      banner = { tone: 'block', label: `BLOCKED — ${label}`, msg: v.headline };
       break;
+    }
     case 'WARNING':
       banner = { tone: 'warn', label: 'WARNING — HUMAN REVIEW', msg: v.headline };
       break;
     case 'APPROVED':
-      banner = { tone: 'pass', label: 'APPROVED', msg: 'Cleared by IntentChain. The agent may now call PayPal.' };
+      banner =
+        v.payment_route === 'AUTO_PAY'
+          ? { tone: 'pass', label: 'APPROVED', msg: 'Passed all five checks. Auto-pay is not connected on this server, so pay through PayPal checkout.' }
+          : {
+              tone: 'warn',
+              label: 'MANAGER APPROVAL REQUIRED',
+              msg: `Passed all five checks. $${tx.item.amount} is above the $${limit} auto-pay limit, so a manager decides.`,
+            };
       break;
     case 'ORDER_CREATED':
-      banner = { tone: 'pass', label: 'APPROVED — AWAITING BUYER', msg: 'PayPal order created. Approve it as the buyer to capture the payment.' };
+      banner = { tone: 'warn', label: 'MANAGER APPROVAL REQUIRED', msg: 'PayPal order created. The manager approves it in PayPal to capture the payment.' };
       break;
     case 'CAPTURED':
-      banner = { tone: 'pass', label: simulated ? 'PAYMENT CAPTURED (SIMULATED)' : 'PAYMENT CAPTURED', msg: 'Paid through PayPal and linked to the human intent.' };
+      banner = auto
+        ? {
+            tone: 'pass',
+            label: simulated ? 'AUTO-PAID (SIMULATED)' : 'AUTO-PAID',
+            msg: `Under the $${limit} auto-pay limit. Paid through the company’s PayPal billing agreement — no approval needed.`,
+          }
+        : {
+            tone: 'pass',
+            label: simulated ? 'MANAGER APPROVED · PAYMENT CAPTURED (SIMULATED)' : 'MANAGER APPROVED · PAYMENT CAPTURED',
+            msg: 'Approved by the manager in PayPal and linked to the original request.',
+          };
       break;
     case 'OUTCOME_FAILED':
       banner = { tone: 'block', label: 'PAYMENT SUCCESS · OUTCOME FAILED', msg: 'The booking was cancelled after payment. Recovery required.' };
       break;
     case 'REFUNDED':
-      banner = { tone: 'warn', label: 'PAYMENT SUCCESS · OUTCOME FAILED · REFUNDED', msg: 'The payment succeeded but the goal was not met. Refunded; recovery is in progress.' };
+      banner = { tone: 'warn', label: 'PAYMENT SUCCESS · OUTCOME FAILED · REFUNDED', msg: 'The payment succeeded but the goal was not met. Refunded through PayPal; a replacement is proposed below.' };
       break;
     default:
       banner = { tone: 'block', label: tx.status.replace(/_/g, ' '), msg: tx.payment?.error ?? 'PayPal reported an error.' };
@@ -88,7 +110,7 @@ export function ValidationCard({
 
   return (
     <section className="panel">
-      <h2><span className="step">4</span>IntentChain firewall</h2>
+      <h2><span className="step">5</span>IntentChain firewall</h2>
       <div className="verdict">
         <div className="what">
           <h3>{tx.item.name}</h3>
@@ -100,6 +122,7 @@ export function ValidationCard({
       </div>
 
       <div className="checks">
+        {v.policy && <RuleCheck name="Policy" check={v.policy} />}
         <RuleCheck name="Budget" check={v.budget} />
         <RuleCheck name="Authority" check={v.authority} />
         <RuleCheck name="Scope" check={v.scope} />
@@ -128,7 +151,7 @@ export function ValidationCard({
           )}
           {tx.status === 'APPROVED' && (
             <button className="btn paypal" disabled={busy !== null} onClick={pay}>
-              {busy === 'paypal/order' ? 'Creating order…' : 'Pay with PayPal'}
+              {busy === 'paypal/order' ? 'Creating order…' : 'Approve & pay with PayPal'}
             </button>
           )}
           {tx.status === 'ORDER_CREATED' && (
@@ -188,7 +211,13 @@ export function ValidationCard({
             </span>
           )}
           {tx.payment.refund_id && <span>Refund <code>{tx.payment.refund_id}</code></span>}
-          <span>{simulated ? 'Simulated — no PayPal call was made' : 'PayPal sandbox via Agent Toolkit'}</span>
+          <span>
+            {simulated
+              ? 'Simulated — no PayPal call was made'
+              : auto
+                ? 'PayPal sandbox · billing agreement (auto-pay)'
+                : 'PayPal sandbox via Agent Toolkit'}
+          </span>
         </div>
       )}
 
@@ -226,11 +255,11 @@ export function ValidationCard({
       {approving && tx.status === 'ORDER_CREATED' && (
         <div className="scrim">
           <div className="modal" role="dialog" aria-label="PayPal approval">
-            <h3>{simulated ? 'Simulated PayPal approval' : 'Approve in PayPal'}</h3>
+            <h3>{simulated ? 'Simulated manager approval' : 'Manager approval in PayPal'}</h3>
             <p className="sub">
               {simulated
-                ? 'PayPal credentials are not configured, so no PayPal call is made. This stands in for the buyer approval step.'
-                : 'You will be sent to the PayPal sandbox to approve as the buyer, then returned here. Use a sandbox personal account.'}
+                ? 'PayPal credentials are not configured, so no PayPal call is made. This stands in for the manager approving in PayPal.'
+                : 'The manager approves this payment in the PayPal sandbox and is returned here. Use a sandbox personal account.'}
             </p>
             <dl className="kv">
               <dt>Item</dt><dd>{tx.item.name}</dd>
