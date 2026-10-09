@@ -144,14 +144,21 @@ The gateway verifies the signature chain, lists only the tools that grant carrie
 has no token because it has no PayPal tools), runs the same five checks, and lets an agent see
 only the transactions made under its own grant.
 
-[`examples/claude-agent.mjs`](examples/claude-agent.mjs) is a complete LLM agent built on this:
-Claude chooses the tool calls, the gateway decides what reaches PayPal.
+[`examples/llm-agent.mjs`](examples/llm-agent.mjs) is a complete LLM agent built on this, for any
+tool-calling model behind an OpenAI-compatible endpoint: the model chooses the tool calls, the
+gateway decides what reaches PayPal.
 
 ```bash
 export INTENTCHAIN_TOKEN=ic_…      # copied from the demo
-export ANTHROPIC_API_KEY=…
-node examples/claude-agent.mjs "Buy a theme park day ticket for $120."
+export LLM_BASE_URL=…  LLM_API_KEY=…  LLM_MODEL=…
+node examples/llm-agent.mjs "Buy a theme park day ticket for $120."
 ```
+
+Run against the hosted demo with Claude Opus, that request is blocked as a policy violation and
+"Buy the Japan eSIM for the trip" is auto-paid through PayPal.
+
+[`examples/claude-agent.mjs`](examples/claude-agent.mjs) is the same agent written with the
+Anthropic SDK (`ANTHROPIC_API_KEY`). It has not been run in this project's environment.
 
 ## How AI is used
 
@@ -266,7 +273,7 @@ src/lib/
   jev.ts            AI client
   audit.ts          event log and dashboard metrics
   db.ts             SQLite storage, keyed by browser session
-examples/           a real LLM agent that pays through the gateway
+examples/           LLM agents that pay through the gateway
 scripts/            install, start, smoke test, reset
 docs/               architecture notes
 ```

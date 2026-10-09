@@ -5,6 +5,10 @@
 // the grant token, exposes only the tools that grant carries, and runs the
 // firewall before anything reaches PayPal.
 //
+// Not yet run in this project's environment (it needs an Anthropic API key).
+// examples/llm-agent.mjs is the same agent for OpenAI-compatible endpoints,
+// and has been run against the hosted demo.
+//
 // Usage:
 //   1. Open the demo, confirm an intent, click "Copy agent token" on an agent.
 //   2. export INTENTCHAIN_TOKEN=ic_…        (the token you copied)
