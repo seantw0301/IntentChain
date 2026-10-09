@@ -278,7 +278,7 @@ await page.locator('.guide').waitFor();
 const marks = [];
 for (const clip of clips) {
   const start = now();
-  marks.push({ file: clip.file, start });
+  marks.push({ id: clip.id, file: clip.file, start });
   console.log(`[${start.toFixed(1)}s] ${clip.id}`);
   await clip.do(page);
   // hold the scene until its narration has finished (time spent at PayPal does not count)
@@ -310,6 +310,9 @@ const video =
 const audio =
   marks.map((m, i) => `[${i + 1}:a]adelay=${Math.round((m.start - cutBefore(m.start)) * 1000)}:all=1[a${i}]`).join(';') +
   `;${marks.map((_, i) => `[a${i}]`).join('')}amix=inputs=${marks.length}:normalize=0[a]`;
+
+// where each scene starts in the finished file, for re-voicing (scripts/revoice.mjs)
+fs.writeFileSync(path.join(OUT, 'marks.json'), JSON.stringify(marks.map((m) => ({ id: m.id, at: Number((m.start - cutBefore(m.start)).toFixed(2)) })), null, 2));
 
 const final = path.join(OUT, process.env.OUTPUT || 'intentchain-demo.mp4');
 run('ffmpeg', [

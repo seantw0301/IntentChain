@@ -23,11 +23,11 @@ export interface CompanyPolicy {
   created_at: string;
 }
 
-/** How auto-pay reaches PayPal: a billing agreement the owner approved once. */
+/** How auto-pay reaches PayPal: a PayPal account the owner saved once in the PayPal Vault. */
 export interface AutoPay {
   connected: boolean;
   mode: 'sandbox' | 'mock';
-  agreement_id: string | null;
+  token_id: string | null;
 }
 
 export type AgentRole = 'travel' | 'hotel' | 'booking' | 'experience' | 'custom' | 'recovery';
@@ -172,8 +172,8 @@ export type TxStatus =
 
 export interface Payment {
   mode: 'sandbox' | 'mock';
-  /** auto-pay through the billing agreement, or a checkout the manager approves in PayPal */
-  via?: 'billing_agreement' | 'checkout';
+  /** auto-pay through the saved PayPal account (Vault), or a checkout the manager approves in PayPal */
+  via?: 'vault' | 'checkout';
   order_id?: string;
   approve_url?: string | null;
   capture_id?: string;

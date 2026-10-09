@@ -2,10 +2,11 @@
 //
 //   node scripts/connect-autopay.mjs
 //
-// Auto-pay needs a billing agreement: a sandbox buyer approves once that your
-// app may charge them without a login each time. This script creates the
-// request, waits while you approve it in the browser as a sandbox *personal*
-// account, then prints the agreement id to put in .env.
+// Auto-pay uses the PayPal Vault: a sandbox buyer saves their PayPal account
+// once, and your app may then charge it without a login each time. This script
+// creates the setup token, waits while you approve it in the browser as a
+// sandbox *personal* account, exchanges it for a payment token, and prints the
+// line to put in .env.
 //
 // Reads PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET from .env. Sandbox only.
 
@@ -30,7 +31,7 @@ async function paypal(path, body, token) {
   const res = await fetch(`${API}${path}`, {
     method: 'POST',
     headers: token
-      ? { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
+      ? { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', 'PayPal-Request-Id': `intentchain-connect-${Date.now()}` }
       : { Authorization: `Basic ${Buffer.from(`${id}:${secret}`).toString('base64')}`, 'Content-Type': 'application/x-www-form-urlencoded' },
     body,
   });
@@ -41,18 +42,14 @@ async function paypal(path, body, token) {
 
 const { access_token } = await paypal('/v1/oauth2/token', 'grant_type=client_credentials');
 
-const request = await paypal(
-  '/v1/billing-agreements/agreement-tokens',
+const setup = await paypal(
+  '/v3/vault/setup-tokens',
   JSON.stringify({
-    description: 'IntentChain auto-pay for company purchases',
-    payer: { payment_method: 'PAYPAL' },
-    plan: {
-      type: 'MERCHANT_INITIATED_BILLING',
-      merchant_preferences: {
-        return_url: 'https://example.com/approved',
-        cancel_url: 'https://example.com/cancelled',
-        accepted_pymt_type: 'INSTANT',
-        skip_shipping_address: true,
+    payment_source: {
+      paypal: {
+        usage_type: 'MERCHANT',
+        description: 'IntentChain auto-pay for company purchases',
+        experience_context: { return_url: 'https://example.com/approved', cancel_url: 'https://example.com/cancelled' },
       },
     },
   }),
@@ -60,13 +57,17 @@ const request = await paypal(
 );
 
 console.log('\n1. Open this link and approve as a sandbox PERSONAL (buyer) account:\n');
-console.log(`   ${request.links.find((l) => l.rel === 'approval_url').href}\n`);
+console.log(`   ${setup.links.find((l) => l.rel === 'approve').href}\n`);
 console.log('2. When PayPal redirects you to example.com, come back here.\n');
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 await rl.question('Press Enter once you have approved… ');
 rl.close();
 
-const agreement = await paypal('/v1/billing-agreements/agreements', JSON.stringify({ token_id: request.token_id }), access_token);
-console.log(`\nAgreement ${agreement.id} is ${agreement.state} for ${agreement.payer?.payer_info?.email}.`);
+const saved = await paypal(
+  '/v3/vault/payment-tokens',
+  JSON.stringify({ payment_source: { token: { id: setup.id, type: 'SETUP_TOKEN' } } }),
+  access_token,
+);
+console.log(`\nSaved the PayPal account of ${saved.payment_source?.paypal?.email_address ?? 'the buyer'} as payment token ${saved.id}.`);
 console.log('\nAdd this line to .env and restart the app:\n');
-console.log(`   PAYPAL_AUTOPAY_AGREEMENT_ID=${agreement.id}\n`);
+console.log(`   PAYPAL_AUTOPAY_VAULT_ID=${saved.id}\n`);

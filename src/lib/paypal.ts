@@ -218,14 +218,14 @@ export async function verifyWebhook(headers: Headers, rawBody: string): Promise<
   return ((await res.json()) as { verification_status?: string }).verification_status === 'SUCCESS';
 }
 
-/** The billing agreement the owner approved once, which lets the company pay without a login each time. */
-export function autopayAgreement(): string | null {
-  return paypalMode() === 'sandbox' ? process.env.PAYPAL_AUTOPAY_AGREEMENT_ID || null : null;
+/** The PayPal account the owner saved once in the PayPal Vault, which lets the company pay without a login each time. */
+export function autopayToken(): string | null {
+  return paypalMode() === 'sandbox' ? process.env.PAYPAL_AUTOPAY_VAULT_ID || null : null;
 }
 
 /**
- * Auto-pay: creates and captures an order in one call against the owner's
- * billing agreement — no buyer present. The Agent Toolkit's create_order has no
+ * Auto-pay: creates and captures an order in one call against the PayPal
+ * account the owner saved in the Vault — no buyer present. The Agent Toolkit's create_order has no
  * way to name a stored payment source, so this is a direct Orders API call
  * using the toolkit's sandbox client for the access token. The transaction id
  * is the idempotency key, so a retry can never charge twice.
@@ -241,9 +241,9 @@ export async function autoPay(input: {
   if (!toolsFor(input.role).includes('create_order')) {
     throw new Error(`The ${input.role} agent has no permission to pay through PayPal.`);
   }
-  const agreement = autopayAgreement();
-  if (!agreement) {
-    return { mode: 'mock', via: 'billing_agreement', order_id: sim('ORDER'), capture_id: sim('CAP'), capture_status: 'COMPLETED' };
+  const saved = autopayToken();
+  if (!saved) {
+    return { mode: 'mock', via: 'vault', order_id: sim('ORDER'), capture_id: sim('CAP'), capture_status: 'COMPLETED' };
   }
   await toolkit(input.role);
   if (!tokenSource) throw new Error('PayPal client is not available.');
@@ -270,7 +270,7 @@ export async function autoPay(input: {
           ],
         },
       ],
-      payment_source: { token: { id: agreement, type: 'BILLING_AGREEMENT' } },
+      payment_source: { paypal: { vault_id: saved } },
     }),
     signal: AbortSignal.timeout(20000),
   });
@@ -281,7 +281,7 @@ export async function autoPay(input: {
   }
   return {
     mode: 'sandbox',
-    via: 'billing_agreement',
+    via: 'vault',
     order_id: order.id,
     capture_id: capture.id,
     capture_status: String(capture.status ?? order.status),

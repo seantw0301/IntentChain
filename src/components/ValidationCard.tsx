@@ -62,7 +62,7 @@ export function ValidationCard({
   };
 
   const limit = state.policy.auto_pay_limit;
-  const auto = tx.payment?.via === 'billing_agreement';
+  const auto = tx.payment?.via === 'vault';
   let banner: { tone: string; label: string; msg: string };
   switch (tx.status) {
     case 'BLOCKED': {
@@ -92,7 +92,7 @@ export function ValidationCard({
         ? {
             tone: 'pass',
             label: simulated ? 'AUTO-PAID (SIMULATED)' : 'AUTO-PAID',
-            msg: `Under the $${limit} auto-pay limit. Paid through the company’s PayPal billing agreement — no approval needed.`,
+            msg: `Under the $${limit} auto-pay limit. Paid with the company’s saved PayPal account — no approval needed.`,
           }
         : {
             tone: 'pass',
@@ -234,7 +234,7 @@ export function ValidationCard({
             {simulated
               ? 'Simulated — no PayPal call was made'
               : auto
-                ? 'PayPal sandbox · billing agreement (auto-pay)'
+                ? 'PayPal sandbox · Vault (auto-pay)'
                 : 'PayPal sandbox via Agent Toolkit'}
           </span>
         </div>

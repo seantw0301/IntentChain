@@ -43,7 +43,7 @@ interface Row {
 
 function result(t: Transaction): string {
   switch (t.status) {
-    case 'CAPTURED': return t.payment?.via === 'billing_agreement' ? 'Auto-paid' : 'Manager approved';
+    case 'CAPTURED': return t.payment?.via === 'vault' ? 'Auto-paid' : 'Manager approved';
     case 'APPROVED':
     case 'ORDER_CREATED': return 'Awaiting manager';
     case 'WARNING': return 'Human review';
@@ -97,7 +97,7 @@ export default function LedgerGrid({
               ? '—'
               : `${{ pass: 'PASS', fail: 'FAIL', warning: 'REVIEW' }[v.intent.status]} ${v.intent.score ?? ''}`.trim(),
           result: result(t),
-          via: t.payment?.via === 'billing_agreement' ? 'Billing agreement' : t.payment?.via === 'checkout' ? 'Checkout' : '',
+          via: t.payment?.via === 'vault' ? 'PayPal Vault' : t.payment?.via === 'checkout' ? 'Checkout' : '',
           paypal: t.payment?.refund_id ?? t.payment?.capture_id ?? t.payment?.order_id ?? '',
         };
       }),

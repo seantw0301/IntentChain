@@ -96,8 +96,8 @@ check('eSIM $18: all five checks pass, routed to auto-pay',
   v1.policy.pass && v1.budget.pass && v1.authority.pass && v1.scope.pass && v1.intent.status === 'pass' && v1.payment_route === 'AUTO_PAY',
   JSON.stringify(v1));
 if (r.json.autopay.connected) {
-  check('eSIM is paid at once through the billing agreement, nobody in the loop',
-    tx.status === 'CAPTURED' && tx.payment?.via === 'billing_agreement' && r.json.metrics.spent === 18, `${tx.status} ${JSON.stringify(tx.payment)}`);
+  check('eSIM is paid at once with the saved PayPal account, nobody in the loop',
+    tx.status === 'CAPTURED' && tx.payment?.via === 'vault' && r.json.metrics.spent === 18, `${tx.status} ${JSON.stringify(tx.payment)}`);
 }
 
 // 2. authority exceeded

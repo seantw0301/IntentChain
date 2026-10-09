@@ -69,8 +69,8 @@ export function PolicyPanel({ state, call, busy }: { state: AppState; call: Call
             <span className="hint">Auto-pay is simulated (no PayPal credentials on this server)</span>
           ) : autopay.connected ? (
             <>
-              Auto-pay connected <span className="tag jev">billing agreement</span>{' '}
-              <code title="The owner approved this PayPal billing agreement once">{autopay.agreement_id}</code>
+              Auto-pay connected <span className="tag jev">PayPal Vault</span>{' '}
+              <code title="The owner saved this PayPal account once; this is its Vault payment token">{autopay.token_id}</code>
             </>
           ) : (
             <span className="hint">Auto-pay not connected — every payment goes to checkout</span>

@@ -13,7 +13,7 @@ RUN_AS="${DEPLOY_USER:-www}"
 rsync -az --delete \
   -e "ssh -p $PORT" \
   --exclude node_modules --exclude .next --exclude data --exclude .env --exclude .git \
-  --exclude docs/internal --exclude '*.tsbuildinfo' --exclude .DS_Store \
+  --exclude docs/internal --exclude video --exclude '*.tsbuildinfo' --exclude .DS_Store \
   ./ "$DEPLOY_HOST:$DEPLOY_DIR/"
 
 ssh -p "$PORT" "$DEPLOY_HOST" "DIR='$DEPLOY_DIR' RUN_AS='$RUN_AS' bash -s" <<'REMOTE'

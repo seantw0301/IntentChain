@@ -32,7 +32,7 @@ auto-pay limit. Connect PayPal once.
 
 | Outcome | When | What happens |
 |---|---|---|
-| **Auto-pay** | Passes all five checks and is at or under the auto-pay limit | Paid at once through the company's PayPal billing agreement. Nobody in the loop |
+| **Auto-pay** | Passes all five checks and is at or under the auto-pay limit | Paid at once with the PayPal account the company saved in the PayPal Vault. Nobody in the loop |
 | **Manager approval** | Passes all five checks but is over the limit | A manager approves it in PayPal; then it is captured |
 | **Blocked** | Any check fails | Nothing reaches PayPal. The firewall names the agent, or the delegation hop, responsible |
 
@@ -109,7 +109,7 @@ Everything runs in the PayPal sandbox. Sandbox mode is hard-wired; the app canno
 
 | What | How |
 |---|---|
-| **Auto-pay** | A PayPal **billing agreement** the owner approves once. Orders under the limit are created and captured in a single Orders API call against that agreement, with the transaction id as the idempotency key — no buyer present |
+| **Auto-pay** | The **PayPal Vault**: the owner saves the company's PayPal account once. Orders under the limit are created and captured in a single Orders API call against that vaulted payment token, with the transaction id as the idempotency key — no buyer present |
 | **Manager approval** | PayPal Agent Toolkit `create_order` → the manager approves in PayPal → `get_order` → `pay_order` |
 | **Refunds** | PayPal Agent Toolkit `create_refund` when an outcome fails |
 | **Reconciliation** | PayPal Agent Toolkit `get_order` and `get_refund` read every order back and compare it with IntentChain's ledger |
@@ -121,7 +121,7 @@ instance with only the actions it is allowed ([`src/lib/paypal.ts`](src/lib/payp
 permissions narrow along the delegation chain exactly as spending authority does.
 
 Two calls go to the PayPal REST API directly because the Agent Toolkit does not cover them:
-auto-pay against a billing agreement, and webhook signature verification. Both reuse the toolkit's
+auto-pay against a vaulted payment token, and webhook signature verification. Both reuse the toolkit's
 sandbox client for authentication.
 
 ## Bring your own agent
@@ -195,13 +195,13 @@ what you put in it:
 |---|---|
 | Nothing | Fully working demo. Payments are **simulated** and AI scores come from bundled **cached** reference data. Both are labelled as such in the UI |
 | `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET` | Real PayPal **sandbox** orders, captures and refunds |
-| `PAYPAL_AUTOPAY_AGREEMENT_ID` | Real **auto-pay**: the id of a sandbox billing agreement a buyer approved for your app. Without it, small purchases fall back to checkout |
+| `PAYPAL_AUTOPAY_VAULT_ID` | Real **auto-pay**: the Vault payment token of a sandbox buyer who saved their PayPal account for your app. Without it, small purchases fall back to checkout |
 | `JEV_API_KEY` | **Live** AI intent analysis |
 | `CHANNEL3_API_KEY` | **Live product search** for office purchases, in place of the demo catalogue |
 | `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL` | Agents that **plan for themselves** with a tool-calling LLM (OpenAI-compatible endpoint) |
 
 To connect auto-pay to your own sandbox app, run `node scripts/connect-autopay.mjs`: it creates
-the billing agreement request, waits while you approve it as a sandbox buyer, and prints the line
+a Vault setup token, waits while you approve it as a sandbox buyer, exchanges it for a payment token, and prints the line
 to add to `.env`.
 
 To get PayPal sandbox credentials, create a sandbox app at
@@ -276,7 +276,7 @@ More detail: [docs/architecture.md](docs/architecture.md).
 ## Tools used
 
 - **PayPal Agent Toolkit** and the PayPal sandbox — orders, captures, refunds, reconciliation
-- **PayPal billing agreements** — auto-pay without a buyer present
+- **PayPal Vault (payment method tokens v3)** — auto-pay without a buyer present
 - **PayPal Webhooks** — signature-verified payment events
 - **Channel3** — live product search across retailers for office purchases
 - **AG Grid** (Community) — the company ledger: per-column sort and filter, quick search, pinned totals row, CSV export
@@ -289,7 +289,7 @@ More detail: [docs/architecture.md](docs/architecture.md).
 
 - Hotels and products are fixed demo data; there is no live product search.
 - Two scenarios (a business trip and a short office purchase) are scripted. Most steps follow fixed workflows; the drift step and *Ask an agent* are planned by an LLM when one is configured. Custom purchases, your own delegated tasks and the agent gateway let you go off-script.
-- The hosted demo shares one sandbox billing agreement for auto-pay, so every visitor's auto-paid purchases come from the same sandbox buyer.
+- The hosted demo shares one saved sandbox PayPal account for auto-pay, so every visitor's auto-paid purchases come from the same sandbox buyer.
 - Recovery stops at a proposal awaiting human approval; it does not pay for the replacement.
 - Grants are signed with a server-held HMAC key. Agents here run inside one process; in a real deployment each agent would hold its own key.
 - No accounts: each browser session gets isolated state that is discarded after 24 idle hours.

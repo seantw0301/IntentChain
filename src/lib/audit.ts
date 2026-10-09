@@ -2,7 +2,7 @@ import { db, list, newId } from './db';
 import { channel3Enabled } from './channel3';
 import { aiMode } from './jev';
 import { llmModel } from './llm';
-import { autopayAgreement, paypalMode } from './paypal';
+import { autopayToken, paypalMode } from './paypal';
 import { getPolicy } from './policy';
 import type {
   AppState,
@@ -89,9 +89,9 @@ export function snapshot(session: string): AppState {
     delegations,
     policy: getPolicy(session),
     autopay: {
-      connected: paypalMode() === 'mock' || Boolean(autopayAgreement()),
+      connected: paypalMode() === 'mock' || Boolean(autopayToken()),
       mode: paypalMode(),
-      agreement_id: autopayAgreement(),
+      token_id: autopayToken(),
     },
     grant_tokens: Object.fromEntries(
       delegations

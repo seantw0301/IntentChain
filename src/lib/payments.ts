@@ -1,7 +1,7 @@
 import { emit, spent } from './audit';
 import { ITEMS, RECOVERY_OPTION } from './catalog';
 import { findByPayPalId, get, list, newId, put } from './db';
-import { autoPay, autopayAgreement, captureOrder, createOrder, orderStatus, paypalMode, readOrder, readRefund, refundCapture } from './paypal';
+import { autoPay, autopayToken, captureOrder, createOrder, orderStatus, paypalMode, readOrder, readRefund, refundCapture } from './paypal';
 import { asNoul, ask } from './jev';
 import { evaluate } from './validator';
 import { ApiError } from './types';
@@ -81,12 +81,12 @@ export async function createPayment(session: string, id: string, origin: string)
 
 /**
  * Auto-pay: a purchase that passed every check and is under the owner's limit
- * is paid at once through the company's PayPal billing agreement.
+ * is paid at once through the PayPal account the company saved in the Vault.
  */
 export async function autoSettle(session: string, tx: Transaction): Promise<Transaction> {
   if (tx.status !== 'APPROVED' || tx.validation.payment_route !== 'AUTO_PAY') return tx;
-  // with PayPal live but no billing agreement on file, fall back to an ordinary checkout
-  if (paypalMode() === 'sandbox' && !autopayAgreement()) return tx;
+  // with PayPal live but no saved PayPal account, fall back to an ordinary checkout
+  if (paypalMode() === 'sandbox' && !autopayToken()) return tx;
   try {
     tx.payment = await autoPay({
       role: tx.agent,
@@ -107,7 +107,7 @@ export async function autoSettle(session: string, tx: Transaction): Promise<Tran
     });
   } catch (err) {
     tx.status = 'PAYMENT_FAILED';
-    tx.payment = { mode: paypalMode(), via: 'billing_agreement', error: (err as Error).message };
+    tx.payment = { mode: paypalMode(), via: 'vault', error: (err as Error).message };
     save(session, tx);
     emit(session, 'payment.failed', 'paypal', { intent_id: tx.intent_id, transaction_id: tx.id }, {
       item: tx.item.name,

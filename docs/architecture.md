@@ -47,7 +47,7 @@ cruise in the demo passes Policy, Budget, Authority and Scope; only Intent, toge
 drift recorded on its delegation chain, stops it.
 
 A purchase that passes all five is routed by amount: at or under the owner's auto-pay limit it is
-captured immediately against the company's PayPal billing agreement; over it, the transaction
+captured immediately with the PayPal account the company saved in the PayPal Vault; over it, the transaction
 waits for a manager to approve the PayPal order.
 
 The request itself must fit inside the company policy (a trip budget above the company limit is
